@@ -514,7 +514,7 @@ async def get_eqids_and_types(
 
         # Every equivalent identifier here has the same type.
         for eqid in eqids[index]:
-            eqid.update({'t': [typ]})
+            eqid.update({'types': [typ]})
 
     return eqids, types_with_ancestors
 
@@ -525,7 +525,8 @@ async def get_normalized_nodes(
         conflate_gene_protein: bool,
         conflate_chemical_drug: bool,
         include_descriptions: bool = False,
-        include_individual_types: bool = True
+        include_individual_types: bool = True,
+        include_taxa: bool = True,
 ) -> Dict[str, Optional[str]]:
     """
     Get value(s) for key(s) using redis MGET
@@ -634,6 +635,7 @@ async def get_normalized_nodes(
         input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
                                        include_descriptions=include_descriptions,
                                        include_individual_types=include_individual_types,
+                                       include_taxa=include_taxa,
                                        conflations={
                                            'GeneProtein': conflate_gene_protein,
                                            'DrugChemical': conflate_chemical_drug,
@@ -674,7 +676,7 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
 
 
 async def create_node(app, canonical_id, equivalent_ids, types, info_contents, include_descriptions=True,
-                      include_individual_types=False, conflations=None):
+                      include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
     if canonical_id is None:
@@ -811,9 +813,12 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
         # if descriptions is enabled and exist add them to each eq_id entry
         if include_descriptions and "d" in eqid and len(eqid["d"]):
             eq_item["description"] = eqid["d"][0]
+        # if include_taxa is enabled and we have taxa on this node, add them to every eq_id entry
+        if include_taxa and "t" in eqid and len(eqid["t"]):
+            eq_item["taxa"] = eqid["t"]
         # if individual types have been requested, add them too.
-        if include_individual_types and 't' in eqid:
-            eq_item["type"] = eqid['t'][-1]
+        if include_individual_types and 'types' in eqid:
+            eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
     # We need to remove `biolink:Entity` from the types returned.

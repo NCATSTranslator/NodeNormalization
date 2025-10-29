@@ -263,7 +263,8 @@ async def get_normalized_node_handler(
     conflate: bool = fastapi.Query(True, description="Whether to apply gene/protein conflation"),
     drug_chemical_conflate: bool = fastapi.Query(False, description="Whether to apply drug/chemical conflation"),
     description: bool = fastapi.Query(False, description="Whether to return curie descriptions when possible"),
-    individual_types: bool = fastapi.Query(False, description="Whether to return individual types for equivalent identifiers")
+    individual_types: bool = fastapi.Query(False, description="Whether to return individual types for equivalent identifiers"),
+    include_taxa: bool = fastapi.Query(True, description="Whether to return taxa for equivalent identifiers"),
 ):
     """
     Get value(s) for key(s) using redis MGET
@@ -271,7 +272,9 @@ async def get_normalized_node_handler(
     # no_conflate = request.args.get('dontconflate',['GeneProtein'])
     normalized_nodes = await get_normalized_nodes(app, curie, conflate, drug_chemical_conflate,
                                                   include_descriptions=description,
-                                                  include_individual_types=individual_types)
+                                                  include_individual_types=individual_types,
+                                                  include_taxa=include_taxa,
+                                                  )
 
     # If curie contains at least one entry, then the only way normalized_nodes could be blank
     # would be if an error occurred during processing.
@@ -291,7 +294,9 @@ async def get_normalized_node_handler_post(curies: CurieList):
     Get value(s) for key(s) using redis MGET
     """
     normalized_nodes = await get_normalized_nodes(app, curies.curies, curies.conflate, curies.drug_chemical_conflate,
-                                                  curies.description, include_individual_types=curies.individual_types)
+                                                  curies.description, include_individual_types=curies.individual_types,
+                                                  include_taxa=curies.include_taxa,
+                                                  )
 
     # If curies.curies contains at least one entry, then the only way normalized_nodes could be blank
     # would be if an error occurred during processing.

@@ -36,6 +36,11 @@ class CurieList(BaseModel):
         title="Whether to return individual types for equivalent identifiers"
     )
 
+    include_taxa: bool = Field(
+        True,
+        title="Whether to return taxa for equivalent identifiers"
+    )
+
     class Config:
         schema_extra = {
             "example": {

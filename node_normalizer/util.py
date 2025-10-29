@@ -11,6 +11,20 @@ from fastapi.logger import logger as fastapi_logger
 # Some constants.
 BIOLINK_NAMED_THING = "biolink:NamedThing"
 
+def get_numerical_curie_suffix(curie):
+    """
+    If a CURIE has a numerical suffix, return it as an integer. Otherwise return None.
+    :param curie: A CURIE.
+    :return: An integer if the CURIE suffix is castable to int, otherwise None.
+    """
+    curie_parts = curie.split(":", 1)
+    if len(curie_parts) > 0:
+        # Try to cast the CURIE suffix to an integer. If we get a ValueError, don't worry about it.
+        try:
+            return int(curie_parts[1])
+        except ValueError:
+            pass
+    return None
 
 # loggers = {}
 class LoggingUtil(object):

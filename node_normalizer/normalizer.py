@@ -17,7 +17,12 @@ from bmt.utils import format_element as bmt_format
 from fastapi import FastAPI
 from reasoner_pydantic import KnowledgeGraph, Message, QueryGraph, Result, CURIE, Attribute
 
-from .util import LoggingUtil, uniquify_list, BIOLINK_NAMED_THING
+from .util import (
+    LoggingUtil,
+    uniquify_list,
+    BIOLINK_NAMED_THING,
+    get_numerical_curie_suffix,
+)
 
 # logger = LoggingUtil.init_logging(__name__, level=logging.INFO, format='medium', logFilePath=os.path.dirname(__file__), logFileLevel=logging.INFO)
 logger = LoggingUtil.init_logging()
@@ -514,7 +519,7 @@ async def get_eqids_and_types(
 
         # Every equivalent identifier here has the same type.
         for eqid in eqids[index]:
-            eqid.update({'t': [typ]})
+            eqid.update({'types': [typ]})
 
     return eqids, types_with_ancestors
 
@@ -525,7 +530,8 @@ async def get_normalized_nodes(
         conflate_gene_protein: bool,
         conflate_chemical_drug: bool,
         include_descriptions: bool = False,
-        include_individual_types: bool = True
+        include_individual_types: bool = True,
+        include_taxa: bool = True,
 ) -> Dict[str, Optional[str]]:
     """
     Get value(s) for key(s) using redis MGET
@@ -634,6 +640,7 @@ async def get_normalized_nodes(
         input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
                                        include_descriptions=include_descriptions,
                                        include_individual_types=include_individual_types,
+                                       include_taxa=include_taxa,
                                        conflations={
                                            'GeneProtein': conflate_gene_protein,
                                            'DrugChemical': conflate_chemical_drug,
@@ -674,7 +681,7 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
 
 
 async def create_node(app, canonical_id, equivalent_ids, types, info_contents, include_descriptions=True,
-                      include_individual_types=False, conflations=None):
+                      include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
     if canonical_id is None:
@@ -791,30 +798,33 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
     # Now that we've determined a label for this clique, we should never use identifiers_with_labels, possible_labels,
     # or filtered_possible_labels after this point.
 
-    # if descriptions are enabled look for the first available description and use that 
-    if include_descriptions:
-        descriptions = list(
-            map(
-                lambda x: x[0],
-                filter(lambda x: len(x) > 0, [eid['d'] for eid in eids if 'd' in eid])
-                )
-        )
-        if len(descriptions) > 0:
-            node["id"]["description"] = descriptions[0]
-
     # now need to reformat the identifier keys.  It could be cleaner but we have to worry about if there is a label
+    first_description = None
+    node_taxa = set()
     node["equivalent_identifiers"] = []
     for eqid in eids:
         eq_item = {"identifier": eqid["i"]}
-        if "l" in eqid:
+        if "l" in eqid and eqid["l"]:
             eq_item["label"] = eqid["l"]
         # if descriptions is enabled and exist add them to each eq_id entry
-        if include_descriptions and "d" in eqid and len(eqid["d"]):
+        if include_descriptions and "d" in eqid and len(eqid["d"]) > 0:
             eq_item["description"] = eqid["d"][0]
+            if not first_description:
+                first_description = eq_item["description"]
+        # if include_taxa is enabled and we have taxa on this node, add them to every eq_id entry
+        if include_taxa and "t" in eqid and eqid["t"]:
+            eq_item["taxa"] = eqid["t"]
+            node_taxa.update(eqid["t"])
         # if individual types have been requested, add them too.
-        if include_individual_types and 't' in eqid:
-            eq_item["type"] = eqid['t'][-1]
+        if include_individual_types and 'types' in eqid:
+            eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
+
+    if include_descriptions and first_description:
+        node["description"] = first_description
+
+    if include_taxa and node_taxa:
+        node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/TranslatorSRI/NodeNormalization/issues/173)

@@ -820,10 +820,10 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
-    if include_descriptions:
+    if include_descriptions and first_description:
         node["description"] = first_description
 
-    if include_taxa:
+    if include_taxa and node_taxa:
         node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)
 
     # We need to remove `biolink:Entity` from the types returned.

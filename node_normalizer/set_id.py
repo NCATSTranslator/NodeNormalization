@@ -41,7 +41,7 @@ async def generate_setid(app, curies, conflations) -> SetIDResponse:
 
     # We use get_normalized_nodes() to normalize all the CURIEs for us.
     normalization_results = await get_normalized_nodes(
-        app, curies, gene_protein_conflation, drug_chemical_conflation, include_descriptions=False, include_individual_types=False, include_taxa=True
+        app, curies, gene_protein_conflation, drug_chemical_conflation, include_descriptions=False, include_individual_types=False, include_taxa=False
     )
 
     # We prepare a set of sorted, deduplicated curies.

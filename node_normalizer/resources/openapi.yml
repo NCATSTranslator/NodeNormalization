@@ -9,13 +9,16 @@ info:
     x-role: responsible developer
   description: 'Node Normalization takes a CURIE, and returns: <ol> <li>The preferred
     CURIE for this entity <li>All other known equivalent identifiers for the entity
-    <li>Semantic types for the entity as defined by the <a href="https://biolink.github.io/biolink-model/">BioLink
+    <li>Semantic types for the entity as defined by the <a href="https://biolink.github.io/biolink-model/">Biolink
     Model</a> </ol> The data served by Node Normalization is created by <a href="https://github.com/TranslatorSRI/Babel">Babel</a>,
     which attempts to find identifier equivalences, and makes sure that CURIE prefixes
-    are BioLink Model Compliant.  To determine whether Node Normalization is likely
+    are BioLink Model Compliant. To determine whether Node Normalization is likely
     to be useful, check /get_semantic_types, which lists the BioLink semantic types
     for which normalization has been attempted, and /get_curie_prefixes, which lists
-    the number of times each prefix is used for a semantic type.'
+    the number of times each prefix is used for a semantic type. You can find out more about these API methods at the
+    <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md">Node Normalization API documentation</a>.
+    To learn more about how Babel creates cliques of equivalent identifiers, you can
+    <a href="https://github.com/TranslatorSRI/Babel/blob/master/docs/README.md">read its documentation</a>.'
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -43,7 +46,8 @@ tags:
 paths:
   /get_curie_prefixes:
     get:
-      description: Returns the curies and their hit count for a semantic type(s).
+      description: 'Returns the curies and their hit count for a semantic type(s). You can read more about this endpoint
+        in the <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_curie_prefixes">NodeNorm API documentation</a>.'
       parameters:
       - in: query
         name: semantic_type
@@ -78,8 +82,9 @@ paths:
       - Interfaces
   /get_normalized_nodes:
     get:
-      description: Returns the equivalent identifiers and semantic types for the curie(s)
-        entered.
+      description: 'Returns the equivalent identifiers and semantic types for the curie(s)
+        entered. You can read more about this endpoint in the
+        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_normalized_nodes">NodeNorm API documentation</a>. '
       parameters:
       - in: query
         name: curie
@@ -146,8 +151,9 @@ paths:
       - Interfaces
   /get_semantic_types:
     get:
-      description: Returns a distinct set of the semantic types discovered in the
-        compendium data.
+      description: 'Returns a distinct set of the semantic types discovered in the
+        compendium data. You can read more about this endpoint in the
+        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_semantic_types">NodeNorm API documentation</a>.'
       responses:
         '200':
           content:
@@ -167,7 +173,16 @@ paths:
       - Interfaces
   /get_allowed_conflations:
     get:
-      description: Returns a list of allowed conflation options
+      description: 'Returns a list of allowed conflation options. Conflation allows cliques to be combined on-the-fly
+      on the basis of two different criteria:
+      <ol>
+      <li><code>GeneProtein</code> conflation merges protein-coding genes with the proteins they encode. The gene(s) always
+      appear first in the combined clique.
+      <li><code>DrugChemical</code> conflation merges chemicals based on their active ingredient. We attempt to ensure that
+      the active ingredient appears before any formulations in the combined clique.
+      </ol>
+      You can read <a href="https://github.com/NCATSTranslator/Babel/blob/master/docs/Conflation.md">more about conflation</a> or
+      <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_allowed_conflations">more about this endpoint</a>.'
       responses:
         '200':
           content:

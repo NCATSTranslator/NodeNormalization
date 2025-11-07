@@ -1,7 +1,6 @@
 name: Generate a contributors report
 on:
   workflow_dispatch:
-  push:
 
 jobs:
   build:

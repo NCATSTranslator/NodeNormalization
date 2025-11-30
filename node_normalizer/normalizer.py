@@ -799,18 +799,19 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
     # or filtered_possible_labels after this point.
 
     # now need to reformat the identifier keys.  It could be cleaner but we have to worry about if there is a label
-    first_description = None
+    descriptions = []
     node_taxa = set()
     node["equivalent_identifiers"] = []
     for eqid in eids:
         eq_item = {"identifier": eqid["i"]}
         if "l" in eqid and eqid["l"]:
             eq_item["label"] = eqid["l"]
-        # if descriptions is enabled and exist add them to each eq_id entry
+        # if descriptions is enabled, add it to descriptions.
         if include_descriptions and "d" in eqid and len(eqid["d"]) > 0:
-            eq_item["description"] = eqid["d"][0]
-            if not first_description:
-                first_description = eq_item["description"]
+            desc = eqid["d"][0]
+            eq_item["description"] = desc
+            if desc not in descriptions:
+                descriptions.append(desc)
         # if include_taxa is enabled and we have taxa on this node, add them to every eq_id entry
         if include_taxa and "t" in eqid and eqid["t"]:
             eq_item["taxa"] = eqid["t"]
@@ -820,8 +821,9 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
-    if include_descriptions and first_description:
-        node["description"] = first_description
+    if include_descriptions and descriptions:
+        node["descriptions"] = descriptions
+        node["id"]["description"] = descriptions[0]
 
     if include_taxa and node_taxa:
         node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)

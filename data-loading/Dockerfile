@@ -39,6 +39,9 @@ ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 COPY --chown=nru requirements.txt ${ROOT}
 RUN pip3 install -r requirements.txt
 
+# Copy scripts.
+COPY --chown=nru rdb-to-resp.sh ${ROOT}
+
 # Make sure rdb-cli has been set up.
 # RUN rdb-cli
 

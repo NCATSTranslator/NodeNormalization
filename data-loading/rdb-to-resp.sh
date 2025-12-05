@@ -13,4 +13,4 @@ if [ "$#" -lt 1 ]; then
 fi
 REDIS_VERSION="${2:-6.2}" # Default to a Redis version of 6.2
 
-rdb-cli "$1" --show-progress 1000 resp --target-redis-ver "${REDIS_VERSION}"
+rdb-cli "$1" resp --target-redis-ver "${REDIS_VERSION}"

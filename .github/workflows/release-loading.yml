@@ -1,7 +1,6 @@
 name: 'Publish nodenorm-loading to GitHub Packages'
 
 on:
-    push:
     release:
         types: [published]
 

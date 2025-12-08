@@ -1,5 +1,5 @@
 # Use Redis so we can redis-cli.
-FROM redis:6
+FROM redis:latest
 
 # Configuration
 ARG ROOT=/home/nru

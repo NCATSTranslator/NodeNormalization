@@ -49,7 +49,7 @@ class NodeLoader:
         if input_type in self.ancestor_map:
             return self.ancestor_map[input_type]
         a = self.toolkit.get_ancestors(input_type)
-        ancs = [bmt_format(ai, case="pascal") for ai in a]
+        ancs = [bmt_format(ai) for ai in a]
         if input_type not in ancs:
             ancs = [input_type] + ancs
         self.ancestor_map[input_type] = ancs
@@ -146,38 +146,34 @@ class NodeLoader:
         conflation_redis_connection_name = conflation["redis_db"]
         # init a line counter
         line_counter: int = 0
-        try:
-            conflation_redis: RedisConnection = await self.get_redis(conflation_redis_connection_name)
-            conflation_pipeline = conflation_redis.pipeline()
+        conflation_redis: RedisConnection = await self.get_redis(conflation_redis_connection_name)
+        conflation_pipeline = conflation_redis.pipeline()
 
-            with open(f"{self._conflation_directory}/{conflation_file}", "r", encoding="utf-8") as cfile:
-                logger.info(f"Processing {conflation_file}...")
+        with open(f"{self._conflation_directory}/{conflation_file}", "r", encoding="utf-8") as cfile:
+            logger.info(f"Processing {conflation_file}...")
 
-                # for each line in the file
-                for line in cfile:
-                    line_counter = line_counter + 1
+            # for each line in the file
+            for line in cfile:
+                line_counter = line_counter + 1
 
-                    # load the line into memory
-                    instance: dict = json.loads(line)
+                # load the line into memory
+                instance: dict = json.loads(line)
 
-                    for identifier in instance:
-                        # We need to include the identifier in the list of identifiers so that we know its position
-                        conflation_pipeline.set(identifier, line)
+                for identifier in instance:
+                    # We need to include the identifier in the list of identifiers so that we know its position
+                    conflation_pipeline.set(identifier, line)
 
-                    if self._test_mode != 1 and line_counter % block_size == 0:
-                        await RedisConnection.execute_pipeline(conflation_pipeline)
-                        # Pipeline executed create a new one error
-                        conflation_pipeline = conflation_redis.pipeline()
-                        logger.info(f"{line_counter} {conflation_file} lines processed")
-
-                if self._test_mode != 1:
+                if self._test_mode != 1 and line_counter % block_size == 0:
                     await RedisConnection.execute_pipeline(conflation_pipeline)
-                    logger.info(f"{line_counter} {conflation_file} total lines processed")
+                    # Pipeline executed create a new one error
+                    conflation_pipeline = conflation_redis.pipeline()
+                    logger.info(f"{line_counter} {conflation_file} lines processed")
 
-                print(f"Done loading {conflation_file}...")
-        except Exception as e:
-            logger.error(f"Exception thrown in load_conflation({conflation_file}), line {line_counter}: {e}")
-            return False
+            if self._test_mode != 1:
+                await RedisConnection.execute_pipeline(conflation_pipeline)
+                logger.info(f"{line_counter} {conflation_file} total lines processed")
+
+            print(f"Done loading {conflation_file}...")
 
         # return to the caller
         return True

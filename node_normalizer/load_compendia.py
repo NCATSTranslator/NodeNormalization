@@ -17,7 +17,7 @@ logger = util.LoggingUtil.init_logging()
 redis_config_path = Path(__file__).parent.parent / "redis_config.yaml"
 connection_factory: redis_adapter.RedisConnectionFactory = await redis_adapter.RedisConnectionFactory.create_connection_pool(redis_config_path)
 
-BIOLINK_VERSION = os.getenv("BIOLINK_VERSION", "2.1.0")
+BIOLINK_VERSION = os.getenv("BIOLINK_VERSION", "v4.2.2")
 toolkit = bmt.Toolkit(f"https://raw.githubusercontent.com/biolink/biolink-model/{BIOLINK_VERSION}/biolink-model.yaml")
 
 # class NodeLoader:
@@ -84,48 +84,44 @@ async def load(compendia_files, block_size, dry_run) -> bool:
     # 5-X: conflation databases consisting of canonical_id -> (list of conflated canonical_ids)
     #      Each of these databases corresponds to a particular conflation e.g. gene/protein or chemical/drug
 
-    try:
-        # get the list of files in the directory
-        types_prefixes_redis: redis_adapter.RedisConnection = await get_redis("curie_to_bl_type_db")
-        # for each file validate and process
+    # get the list of files in the directory
+    types_prefixes_redis: redis_adapter.RedisConnection = await get_redis("curie_to_bl_type_db")
+    # for each file validate and process
 
-        # check the validity of the files
-        for comp in compendia_files:
-            if not validate_compendia(comp):
-                logger.warning(f"Compendia file {comp} is invalid.")
-                return False
+    # check the validity of the files
+    for comp in compendia_files:
+        if not validate_compendia(comp):
+            logger.warning(f"Compendia file {comp} is invalid.")
+            return False
 
-        for comp in compendia_files:
-            if not validate_compendia(comp):
-                logger.warning(f"Compendia file {comp} is invalid.")
-                return False
+    for comp in compendia_files:
+        if not validate_compendia(comp):
+            logger.warning(f"Compendia file {comp} is invalid.")
+            return False
 
 
-        for comp in compendia_files:
-            # check the validity of the file
+    for comp in compendia_files:
+        # check the validity of the file
 
-            if not validate_compendia(comp):
-                logger.warning(f"Compendia file {comp} is invalid.")
-                continue
+        if not validate_compendia(comp):
+            logger.warning(f"Compendia file {comp} is invalid.")
+            continue
 
-            # try to load the file
-            loaded = await load_compendium(comp, block_size, dry_run)
-            semantic_types_redis_pipeline = types_prefixes_redis.pipeline()
-            # @TODO add meta data about files eg. checksum to this object
-            # semantic_types_redis_pipeline.set(f"file-{str(comp)}", json.dumps({"source_prefixes": self.source_prefixes}))
-            if dry_run:
-                response = await redis_adapter.RedisConnection.execute_pipeline(semantic_types_redis_pipeline)
-                if asyncio.coroutines.iscoroutine(response):
-                    await response
-            # self.source_prefixes = {}
-            if not loaded:
-                logger.warning(f"Compendia file {comp} did not load.")
-                continue
-        # merge all semantic counts from other files / loaders
-        await merge_semantic_meta_data()
-    except Exception as e:
-        logger.error(f"Exception thrown in load(): {e}")
-        raise e
+        # try to load the file
+        loaded = await load_compendium(comp, block_size, dry_run)
+        semantic_types_redis_pipeline = types_prefixes_redis.pipeline()
+        # @TODO add meta data about files eg. checksum to this object
+        # semantic_types_redis_pipeline.set(f"file-{str(comp)}", json.dumps({"source_prefixes": self.source_prefixes}))
+        if dry_run:
+            response = await redis_adapter.RedisConnection.execute_pipeline(semantic_types_redis_pipeline)
+            if asyncio.coroutines.iscoroutine(response):
+                await response
+        # self.source_prefixes = {}
+        if not loaded:
+            logger.warning(f"Compendia file {comp} did not load.")
+            continue
+    # merge all semantic counts from other files / loaders
+    await merge_semantic_meta_data()
 
     # return to the caller
     return True
@@ -237,97 +233,93 @@ async def load_compendium(compendium_filename: str, block_size: int, dry_run: bo
 
     # init a line counter
     line_counter: int = 0
-    try:
-        term2id_redis: redis_adapter.RedisConnection = await get_redis("eq_id_to_id_db")
-        id2eqids_redis: redis_adapter.RedisConnection = await get_redis("id_to_eqids_db")
-        id2type_redis: redis_adapter.RedisConnection = await get_redis("id_to_type_db")
-        info_content_redis: redis_adapter.RedisConnection = await get_redis("info_content_db")
+    term2id_redis: redis_adapter.RedisConnection = await get_redis("eq_id_to_id_db")
+    id2eqids_redis: redis_adapter.RedisConnection = await get_redis("id_to_eqids_db")
+    id2type_redis: redis_adapter.RedisConnection = await get_redis("id_to_type_db")
+    info_content_redis: redis_adapter.RedisConnection = await get_redis("info_content_db")
 
-        term2id_pipeline = term2id_redis.pipeline()
-        id2eqids_pipeline = id2eqids_redis.pipeline()
-        id2type_pipeline = id2type_redis.pipeline()
-        info_content_pipeline = info_content_redis.pipeline()
+    term2id_pipeline = term2id_redis.pipeline()
+    id2eqids_pipeline = id2eqids_redis.pipeline()
+    id2type_pipeline = id2type_redis.pipeline()
+    info_content_pipeline = info_content_redis.pipeline()
 
-        with open(compendium_filename, "r", encoding="utf-8") as compendium:
-            logger.info(f"Processing {compendium_filename}...")
+    with open(compendium_filename, "r", encoding="utf-8") as compendium:
+        logger.info(f"Processing {compendium_filename}...")
 
-            # for each line in the file
-            for line in compendium:
-                line_counter = line_counter + 1
+        # for each line in the file
+        for line in compendium:
+            line_counter = line_counter + 1
 
-                # load the line into memory
-                instance: dict = json.loads(line)
+            # load the line into memory
+            instance: dict = json.loads(line)
 
-                # save the identifier
-                # "The" identifier is the first one in the presorted identifiers list
-                identifier: str = instance["identifiers"][0]["i"]
+            # save the identifier
+            # "The" identifier is the first one in the presorted identifiers list
+            identifier: str = instance["identifiers"][0]["i"]
 
-                # We want to accumulate statistics for each implied type as well, though we are only keeping the
-                # leaf type in the file (and redis).  so now is the time to expand.  We'll regenerate the same
-                # list on output.
-                semantic_types = get_ancestors(instance["type"])
+            # We want to accumulate statistics for each implied type as well, though we are only keeping the
+            # leaf type in the file (and redis).  so now is the time to expand.  We'll regenerate the same
+            # list on output.
+            semantic_types = get_ancestors(instance["type"])
 
-                # for each semantic type in the list
-                for semantic_type in semantic_types:
-                    # save the semantic type in a set to avoid duplicates
-                    semantic_types.add(semantic_type)
+            # for each semantic type in the list
+            for semantic_type in semantic_types:
+                # save the semantic type in a set to avoid duplicates
+                semantic_types.add(semantic_type)
 
-                    #  create a source prefix if it has not been encountered
-                    if source_prefixes.get(semantic_type) is None:
-                        source_prefixes[semantic_type] = {}
+                #  create a source prefix if it has not been encountered
+                if source_prefixes.get(semantic_type) is None:
+                    source_prefixes[semantic_type] = {}
 
-                    # go through each equivalent identifier in the data row
-                    # each will be assigned the semantic type information
-                    for equivalent_id in instance["identifiers"]:
-                        # split the identifier to just get the data source out of the curie
-                        source_prefix: str = equivalent_id["i"].split(":")[0]
+                # go through each equivalent identifier in the data row
+                # each will be assigned the semantic type information
+                for equivalent_id in instance["identifiers"]:
+                    # split the identifier to just get the data source out of the curie
+                    source_prefix: str = equivalent_id["i"].split(":")[0]
 
-                        # save the source prefix if no already there
-                        if source_prefixes[semantic_type].get(source_prefix) is None:
-                            source_prefixes[semantic_type][source_prefix] = 1
-                        # else just increment the count for the semantic type/source
-                        else:
-                            source_prefixes[semantic_type][source_prefix] += 1
+                    # save the source prefix if no already there
+                    if source_prefixes[semantic_type].get(source_prefix) is None:
+                        source_prefixes[semantic_type][source_prefix] = 1
+                    # else just increment the count for the semantic type/source
+                    else:
+                        source_prefixes[semantic_type][source_prefix] += 1
 
-                        # equivalent_id might be an array, where the first element is
-                        # the identifier, or it might just be a string. not worrying about that case yet.
-                        equivalent_id = equivalent_id["i"]
-                        term2id_pipeline.set(equivalent_id.upper(), identifier)
-                        # term2id_pipeline.set(equivalent_id, identifier)
+                    # equivalent_id might be an array, where the first element is
+                    # the identifier, or it might just be a string. not worrying about that case yet.
+                    equivalent_id = equivalent_id["i"]
+                    term2id_pipeline.set(equivalent_id.upper(), identifier)
+                    # term2id_pipeline.set(equivalent_id, identifier)
 
-                    id2eqids_pipeline.set(identifier, json.dumps(instance["identifiers"]))
-                    id2type_pipeline.set(identifier, instance["type"])
+                id2eqids_pipeline.set(identifier, json.dumps(instance["identifiers"]))
+                id2type_pipeline.set(identifier, instance["type"])
 
-                    # if there is information content add it to the cache
-                    if "ic" in instance:
-                        info_content_pipeline.set(identifier, instance["ic"])
+                # if there is information content add it to the cache
+                if "ic" in instance and instance["ic"] is not None:
+                    info_content_pipeline.set(identifier, instance["ic"])
 
-                if not dry_run and line_counter % block_size == 0:
-                    await redis_adapter.RedisConnection.execute_pipeline(term2id_pipeline)
-                    await redis_adapter.RedisConnection.execute_pipeline(id2eqids_pipeline)
-                    await redis_adapter.RedisConnection.execute_pipeline(id2type_pipeline)
-                    await redis_adapter.RedisConnection.execute_pipeline(info_content_pipeline)
-
-                    # Pipeline executed create a new one error
-                    term2id_pipeline = term2id_redis.pipeline()
-                    id2eqids_pipeline = id2eqids_redis.pipeline()
-                    id2type_pipeline = id2type_redis.pipeline()
-                    info_content_pipeline = info_content_redis.pipeline()
-
-                    logger.info(f"{line_counter} {compendium_filename} lines processed")
-
-            if not dry_run:
+            if not dry_run and line_counter % block_size == 0:
                 await redis_adapter.RedisConnection.execute_pipeline(term2id_pipeline)
                 await redis_adapter.RedisConnection.execute_pipeline(id2eqids_pipeline)
                 await redis_adapter.RedisConnection.execute_pipeline(id2type_pipeline)
                 await redis_adapter.RedisConnection.execute_pipeline(info_content_pipeline)
 
-                logger.info(f"{line_counter} {compendium_filename} total lines processed")
+                # Pipeline executed create a new one error
+                term2id_pipeline = term2id_redis.pipeline()
+                id2eqids_pipeline = id2eqids_redis.pipeline()
+                id2type_pipeline = id2type_redis.pipeline()
+                info_content_pipeline = info_content_redis.pipeline()
 
-            print(f"Done loading {compendium_filename}...")
-    except Exception as e:
-        logger.error(f"Exception thrown in load_compendium({compendium_filename}), line {line_counter}: {e}")
-        return False
+                logger.info(f"{line_counter} {compendium_filename} lines processed")
+
+        if not dry_run:
+            await redis_adapter.RedisConnection.execute_pipeline(term2id_pipeline)
+            await redis_adapter.RedisConnection.execute_pipeline(id2eqids_pipeline)
+            await redis_adapter.RedisConnection.execute_pipeline(id2type_pipeline)
+            await redis_adapter.RedisConnection.execute_pipeline(info_content_pipeline)
+
+            logger.info(f"{line_counter} {compendium_filename} total lines processed")
+
+        print(f"Done loading {compendium_filename}...")
 
     # return to the caller
     return True

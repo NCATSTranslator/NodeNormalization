@@ -4,7 +4,7 @@ API Response Models not described in reasoner-pydantic
 
 from pydantic import BaseModel
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 class SemanticTypes(BaseModel):
@@ -27,5 +27,18 @@ class SemanticTypes(BaseModel):
 class CuriePivot(BaseModel):
     curie_prefix: Dict[str, str]
 
+
 class ConflationList(BaseModel):
     conflations: List
+
+
+class SetIDResponse(BaseModel):
+    curies: List[str]
+    conflations: List[str]
+    error: Optional[str]
+    normalized_curies: Optional[List[str]]
+    normalized_string: Optional[str]
+    setid: Optional[str]
+    # base64: Optional[str]
+    # base64zlib: Optional[str]
+    # sha224hash: Optional[str]

@@ -3,6 +3,8 @@ import itertools
 from pathlib import Path
 
 import json as builtin_json
+import time
+
 import orjson as json
 import logging
 import os
@@ -10,12 +12,17 @@ import uuid
 import traceback
 from typing import List, Dict, Optional, Any, Set, Tuple, Union
 from uuid import UUID
-from bmt.util import format as bmt_format
+from bmt.utils import format_element as bmt_format
 
 from fastapi import FastAPI
 from reasoner_pydantic import KnowledgeGraph, Message, QueryGraph, Result, CURIE, Attribute
 
-from .util import LoggingUtil, uniquify_list, BIOLINK_NAMED_THING
+from .util import (
+    LoggingUtil,
+    uniquify_list,
+    BIOLINK_NAMED_THING,
+    get_numerical_curie_suffix,
+)
 
 # logger = LoggingUtil.init_logging(__name__, level=logging.INFO, format='medium', logFilePath=os.path.dirname(__file__), logFileLevel=logging.INFO)
 logger = LoggingUtil.init_logging()
@@ -52,7 +59,7 @@ def get_ancestors(app, input_type):
     if input_type in app.state.ancestor_map:
         return app.state.ancestor_map[input_type]
     a = app.state.toolkit.get_ancestors(input_type)
-    ancs = [bmt_format(ai,case="pascal") for ai in a]
+    ancs = [bmt_format(ai) for ai in a]
     #if input_type is in ancs, remove it
     if input_type in ancs:
         ancs.remove(input_type)
@@ -66,33 +73,29 @@ async def normalize_message(app: FastAPI, message: Message) -> Message:
     Given a TRAPI message, updates the message to include a
     normalized qgraph, kgraph, and results
     """
-    try:
-        ret = Message()
+    ret = Message()
 
-        logger.debug(f"message.query_graph is None: {message.query_graph is None}")
-        if message.query_graph is not None:
-            merged_qgraph = await normalize_qgraph(app, message.query_graph)
-            ret.query_graph = merged_qgraph
-        logger.debug(f"Merged Qgraph: {merged_qgraph}")
+    logger.debug(f"message.query_graph is None: {message.query_graph is None}")
+    if message.query_graph is not None:
+        merged_qgraph = await normalize_qgraph(app, message.query_graph)
+        ret.query_graph = merged_qgraph
+    logger.debug(f"Merged Qgraph: {merged_qgraph}")
 
-        logger.debug(f"message.knowledge_graph is None: {message.knowledge_graph is None}")
-        if message.knowledge_graph is not None:
-            merged_kgraph, node_id_map, edge_id_map = await normalize_kgraph(app, message.knowledge_graph)
-            ret.knowledge_graph = merged_kgraph
-        logger.debug(f"Merged Kgraph: {merged_kgraph}")
-        logger.debug(f"node_id_map: {node_id_map}")
-        logger.debug(f"edge_id_map: {edge_id_map}")
+    logger.debug(f"message.knowledge_graph is None: {message.knowledge_graph is None}")
+    if message.knowledge_graph is not None:
+        merged_kgraph, node_id_map, edge_id_map = await normalize_kgraph(app, message.knowledge_graph)
+        ret.knowledge_graph = merged_kgraph
+    logger.debug(f"Merged Kgraph: {merged_kgraph}")
+    logger.debug(f"node_id_map: {node_id_map}")
+    logger.debug(f"edge_id_map: {edge_id_map}")
 
-        logger.debug(f"message.results is None: {message.results is None}")
-        if message.results is not None:
-            merged_results = await normalize_results(app, message.results, node_id_map, edge_id_map)
-            ret.results = merged_results
-        logger.debug(f"Merged Results: {merged_results}")
+    logger.debug(f"message.results is None: {message.results is None}")
+    if message.results is not None:
+        merged_results = await normalize_results(app, message.results, node_id_map, edge_id_map)
+        ret.results = merged_results
+    logger.debug(f"Merged Results: {merged_results}")
 
-        return ret
-    except Exception as e:
-        exception_str = "".join(traceback.format_exc())
-        logger.error(f'Exception: {exception_str}')
+    return ret
 
 
 async def normalize_results(app,
@@ -115,87 +118,78 @@ async def normalize_results(app,
 
         node_binding_seen = set()
 
-        try:
-            for node_code, node_bindings in result.node_bindings.items():
-                merged_node_bindings = []
-                for n_bind in node_bindings:
-                    merged_binding = n_bind.dict()
-                    # merged_binding['id'] = node_id_map[n_bind.id.__root__]
-                    merged_binding['id'] = node_id_map[n_bind.id]
+        for node_code, node_bindings in result.node_bindings.items():
+            merged_node_bindings = []
+            for n_bind in node_bindings:
+                merged_binding = n_bind.dict()
+                # merged_binding['id'] = node_id_map[n_bind.id.__root__]
+                merged_binding['id'] = node_id_map[n_bind.id]
 
-                    # get the information content value
-                    ic_attrib = await get_info_content_attribute(app, merged_binding['id'])
+                # get the information content value
+                ic_attrib = await get_info_content_attribute(app, merged_binding['id'])
 
-                    # did we get a good attribute dict
-                    if ic_attrib:
-                        if 'attributes' in merged_binding and merged_binding['attributes'] is not None:
-                            merged_binding['attributes'].append(ic_attrib)
-                        else:
-                            merged_binding['attributes'] = [ic_attrib]
-
-                    node_binding_information = [
-                        "atts" if k == 'attributes'
-                        else (k, tuple(v)) if isinstance(v, list)
-                        else (k, v)
-                        for k, v in merged_binding.items()
-                    ]
-
-                    # if there are attributes in the node binding
-                    if 'attributes' in merged_binding:
-                        # storage for the pydantic Attributes
-                        attribs = []
-
-                        # the items in list of attributes must be of type Attribute
-                        # in order to reuse hash method
-                        if merged_binding['attributes'] is not None:
-                            for attrib in merged_binding['attributes']:
-                                new_attrib = Attribute.parse_obj(attrib)
-
-                                # add the new Attribute to the list
-                                attribs.append(new_attrib)
-
-                            # call to get the hash
-                            atty_hash = _hash_attributes(attribs)
-                            node_binding_information.append(atty_hash)
-                    node_binding_hash = frozenset(node_binding_information)
-
-                    if node_binding_hash in node_binding_seen:
-                        continue
+                # did we get a good attribute dict
+                if ic_attrib:
+                    if 'attributes' in merged_binding and merged_binding['attributes'] is not None:
+                        merged_binding['attributes'].append(ic_attrib)
                     else:
-                        node_binding_seen.add(node_binding_hash)
-                        merged_node_bindings.append(merged_binding)
+                        merged_binding['attributes'] = [ic_attrib]
 
-                merged_result['node_bindings'][node_code] = merged_node_bindings
+                node_binding_information = [
+                    "atts" if k == 'attributes'
+                    else (k, tuple(v)) if isinstance(v, list)
+                    else (k, v)
+                    for k, v in merged_binding.items()
+                ]
 
-        except Exception as e:
-            exception_str = "".join(traceback.format_exc())
-            logger.error(f'Exception: {exception_str}')
+                # if there are attributes in the node binding
+                if 'attributes' in merged_binding:
+                    # storage for the pydantic Attributes
+                    attribs = []
+
+                    # the items in list of attributes must be of type Attribute
+                    # in order to reuse hash method
+                    if merged_binding['attributes'] is not None:
+                        for attrib in merged_binding['attributes']:
+                            new_attrib = Attribute.parse_obj(attrib)
+
+                            # add the new Attribute to the list
+                            attribs.append(new_attrib)
+
+                        # call to get the hash
+                        atty_hash = _hash_attributes(attribs)
+                        node_binding_information.append(atty_hash)
+                node_binding_hash = frozenset(node_binding_information)
+
+                if node_binding_hash in node_binding_seen:
+                    continue
+                else:
+                    node_binding_seen.add(node_binding_hash)
+                    merged_node_bindings.append(merged_binding)
+
+            merged_result['node_bindings'][node_code] = merged_node_bindings
 
         edge_binding_seen = set()
+        for analysis in result.analyses:
+            for edge_code, edge_bindings in analysis.edge_bindings.items():
+                merged_edge_bindings = []
+                for e_bind in edge_bindings:
+                    merged_binding = e_bind.dict()
+                    merged_binding['id'] = edge_id_map[e_bind.id]
 
-        try:
-            for analysis in result.analyses:
-                for edge_code, edge_bindings in analysis.edge_bindings.items():
-                    merged_edge_bindings = []
-                    for e_bind in edge_bindings:
-                        merged_binding = e_bind.dict()
-                        merged_binding['id'] = edge_id_map[e_bind.id]
+                    edge_binding_hash = frozenset([
+                        (k, freeze(v))
+                        for k, v in merged_binding.items()
+                    ])
 
-                        edge_binding_hash = frozenset([
-                            (k, freeze(v))
-                            for k, v in merged_binding.items()
-                        ])
+                    if edge_binding_hash in edge_binding_seen:
+                        continue
+                    else:
+                        edge_binding_seen.add(edge_binding_hash)
+                        merged_edge_bindings.append(merged_binding)
 
-                        if edge_binding_hash in edge_binding_seen:
-                            continue
-                        else:
-                            edge_binding_seen.add(edge_binding_hash)
-                            merged_edge_bindings.append(merged_binding)
-
-                    analysis.edge_bindings[edge_code] = merged_edge_bindings
-                    merged_result['analyses'].append(analysis.dict())
-        except Exception as e:
-            logger.exception(e)
+                analysis.edge_bindings[edge_code] = merged_edge_bindings
+                merged_result['analyses'].append(analysis.dict())
 
         try:
             # This used to have some list comprehension based on types.  But in TRAPI 1.1 the list/dicts get pretty deep.
@@ -292,152 +286,148 @@ async def normalize_kgraph(
     node_id_map: Dict[str, str] = {}
     edge_id_map: Dict[str, str] = {}
 
-    try:
-        # Map for each node id (curie) and its primary id
-        node_id_map: Dict[str, str] = {}
+    # Map for each node id (curie) and its primary id
+    node_id_map: Dict[str, str] = {}
 
-        # Map for each edge id and its primary id
-        edge_id_map: Dict[str, str] = {}
+    # Map for each edge id and its primary id
+    edge_id_map: Dict[str, str] = {}
 
-        # Map for each edge to its s,p,r,o signature
-        primary_edges: Dict[Tuple[str, str, Optional[str], str, Union[UUID, int]], str] = {}
+    # Map for each edge to its s,p,r,o signature
+    primary_edges: Dict[Tuple[str, str, Optional[str], str, Union[UUID, int]], str] = {}
 
-        # cache for primary node ids
-        primary_nodes_seen = set()
+    # cache for primary node ids
+    primary_nodes_seen = set()
 
-        # Count of times a node has been merged for attribute merging
-        node_merge_count: Dict[str, int] = {}
+    # Count of times a node has been merged for attribute merging
+    node_merge_count: Dict[str, int] = {}
 
-        # cache for nodes
-        nodes_seen = set()
+    # cache for nodes
+    nodes_seen = set()
 
-        # cache for subject, predicate, relation, object, attribute hash tuples
-        edges_seen: Set[Tuple[str, str, str, str, Union[UUID, int]]] = set()
+    # cache for subject, predicate, relation, object, attribute hash tuples
+    edges_seen: Set[Tuple[str, str, str, str, Union[UUID, int]]] = set()
 
-        for node_id, node in kgraph.nodes.items():
-            if node_id in nodes_seen:
-                continue
+    for node_id, node in kgraph.nodes.items():
+        if node_id in nodes_seen:
+            continue
 
-            nodes_seen.add(node_id)
-            node_id_map[node_id] = node_id  # expected to overridden by primary id
+        nodes_seen.add(node_id)
+        node_id_map[node_id] = node_id  # expected to overridden by primary id
 
-            merged_node = node.dict()
+        merged_node = node.dict()
 
-            equivalent_curies = await get_equivalent_curies(app, node_id)
+        equivalent_curies = await get_equivalent_curies(app, node_id)
 
-            if equivalent_curies[node_id]:
-                primary_id = equivalent_curies[node_id]['id']['identifier']
-                node_id_map[node_id] = primary_id
+        if equivalent_curies[node_id]:
+            primary_id = equivalent_curies[node_id]['id']['identifier']
+            node_id_map[node_id] = primary_id
 
-                if primary_id in primary_nodes_seen:
-                    merged_node = _merge_node_attributes(
-                        node_a=merged_kgraph['nodes'][primary_id],
-                        node_b=node.dict(),
-                        merged_count=node_merge_count[primary_id]
-                    )
-                    merged_kgraph['nodes'][primary_id] = merged_node
-                    node_merge_count[primary_id] += 1
-                    continue
-                else:
-                    node_merge_count[primary_id] = 0
-
-                primary_nodes_seen.add(primary_id)
-
-                if 'label' in equivalent_curies[node_id]['id']:
-                    primary_label = equivalent_curies[node_id]['id']['label']
-                elif 'name' in merged_node:
-                    primary_label = merged_node['name']
-                else:
-                    primary_label = ''
-
-                merged_node['name'] = primary_label
-
-                # Even if there's already a same_as attribute we add another
-                # since it is coming from a new source
-                if 'equivalent_identifiers' in equivalent_curies[node_id]:
-                    same_as_attribute = {
-                        'attribute_type_id': 'biolink:same_as',
-                        'value': [
-                            node['identifier']
-                            for node in equivalent_curies[node_id]['equivalent_identifiers']
-                        ],
-                        'original_attribute_name': 'equivalent_identifiers',
-                        "value_type_id": "EDAM:data_0006",
-
-                        # TODO, should we add the app version as the source
-                        # or perhaps the babel/redis cache version
-                        # This will make unit testing a little more tricky
-                        # see https://stackoverflow.com/q/57624731
-
-                        # 'source': f'{app.title} {app.version}',
-                    }
-                    if 'attributes' in merged_node and merged_node['attributes']:
-                        merged_node['attributes'].append(same_as_attribute)
-                    else:
-                        merged_node['attributes'] = [same_as_attribute]
-
-                if 'type' in equivalent_curies[node_id]:
-                    if type(equivalent_curies[node_id]['type']) is list:
-                        merged_node['categories'] = equivalent_curies[node_id]['type']
-                    else:
-                        merged_node['categories'] = [equivalent_curies[node_id]['type']]
-
-                # get the information content value
-                ic_attrib = await get_info_content_attribute(app, node_id)
-
-                # did we get a good attribute dict
-                if ic_attrib:
-                    # add the attribute to the node
-                    merged_node['attributes'].append(ic_attrib)
-
+            if primary_id in primary_nodes_seen:
+                merged_node = _merge_node_attributes(
+                    node_a=merged_kgraph['nodes'][primary_id],
+                    node_b=node.dict(),
+                    merged_count=node_merge_count[primary_id]
+                )
                 merged_kgraph['nodes'][primary_id] = merged_node
-            else:
-                merged_kgraph['nodes'][node_id] = merged_node
-
-        for edge_id, edge in kgraph.edges.items():
-            # Accessing __root__ directly seems wrong,
-            # https://github.com/samuelcolvin/pydantic/issues/730
-            # could also do str(edge.subject)
-            if edge.subject in node_id_map:
-                primary_subject = node_id_map[edge.subject]
-            else:
-                # should we throw a validation error here?
-                primary_subject = edge.subject
-
-            if edge.object in node_id_map:
-                primary_object = node_id_map[edge.object]
-            else:
-                primary_object = edge.object
-
-            hashed_attributes = _hash_attributes(edge.attributes)
-
-            if hashed_attributes is False:
-                # we couldn't hash the attribute so assume unique
-                hashed_attributes = uuid.uuid4()
-
-            triple = (
-                primary_subject,
-                edge.predicate,
-                primary_object,
-                hashed_attributes
-            )
-
-            if triple in edges_seen:
-                edge_id_map[edge_id] = primary_edges[triple]
+                node_merge_count[primary_id] += 1
                 continue
             else:
-                primary_edges[triple] = edge_id
-                edge_id_map[edge_id] = edge_id
+                node_merge_count[primary_id] = 0
 
-            edges_seen.add(triple)
-            merged_edge = edge.dict()
+            primary_nodes_seen.add(primary_id)
 
-            merged_edge['subject'] = primary_subject
-            merged_edge['object'] = primary_object
-            merged_kgraph['edges'][edge_id] = merged_edge
-    except Exception as e:
-        exception_str = "".join(traceback.format_exc())
-        logger.error(f'Exception: {exception_str}')
+            if 'label' in equivalent_curies[node_id]['id']:
+                primary_label = equivalent_curies[node_id]['id']['label']
+            elif 'name' in merged_node:
+                primary_label = merged_node['name']
+            else:
+                primary_label = ''
+
+            merged_node['name'] = primary_label
+
+            # Even if there's already a same_as attribute we add another
+            # since it is coming from a new source
+            if 'equivalent_identifiers' in equivalent_curies[node_id]:
+                same_as_attribute = {
+                    'attribute_type_id': 'biolink:same_as',
+                    'value': [
+                        node['identifier']
+                        for node in equivalent_curies[node_id]['equivalent_identifiers']
+                    ],
+                    'original_attribute_name': 'equivalent_identifiers',
+                    "value_type_id": "EDAM:data_0006",
+
+                    # TODO, should we add the app version as the source
+                    # or perhaps the babel/redis cache version
+                    # This will make unit testing a little more tricky
+                    # see https://stackoverflow.com/q/57624731
+
+                    # 'source': f'{app.title} {app.version}',
+                }
+                if 'attributes' in merged_node and merged_node['attributes']:
+                    merged_node['attributes'].append(same_as_attribute)
+                else:
+                    merged_node['attributes'] = [same_as_attribute]
+
+            if 'type' in equivalent_curies[node_id]:
+                if type(equivalent_curies[node_id]['type']) is list:
+                    merged_node['categories'] = equivalent_curies[node_id]['type']
+                else:
+                    merged_node['categories'] = [equivalent_curies[node_id]['type']]
+
+            # get the information content value
+            ic_attrib = await get_info_content_attribute(app, node_id)
+
+            # did we get a good attribute dict
+            if ic_attrib:
+                # add the attribute to the node
+                merged_node['attributes'].append(ic_attrib)
+
+            merged_kgraph['nodes'][primary_id] = merged_node
+        else:
+            merged_kgraph['nodes'][node_id] = merged_node
+
+    for edge_id, edge in kgraph.edges.items():
+        # Accessing __root__ directly seems wrong,
+        # https://github.com/samuelcolvin/pydantic/issues/730
+        # could also do str(edge.subject)
+        if edge.subject in node_id_map:
+            primary_subject = node_id_map[edge.subject]
+        else:
+            # should we throw a validation error here?
+            primary_subject = edge.subject
+
+        if edge.object in node_id_map:
+            primary_object = node_id_map[edge.object]
+        else:
+            primary_object = edge.object
+
+        hashed_attributes = _hash_attributes(edge.attributes)
+
+        if hashed_attributes is False:
+            # we couldn't hash the attribute so assume unique
+            hashed_attributes = uuid.uuid4()
+
+        triple = (
+            primary_subject,
+            edge.predicate,
+            primary_object,
+            hashed_attributes
+        )
+
+        if triple in edges_seen:
+            edge_id_map[edge_id] = primary_edges[triple]
+            continue
+        else:
+            primary_edges[triple] = edge_id
+            edge_id_map[edge_id] = edge_id
+
+        edges_seen.add(triple)
+        merged_edge = edge.dict()
+
+        merged_edge['subject'] = primary_subject
+        merged_edge['object'] = primary_object
+        merged_kgraph['edges'][edge_id] = merged_edge
 
     return KnowledgeGraph.parse_obj(merged_kgraph), node_id_map, edge_id_map
 
@@ -495,7 +485,7 @@ async def get_info_content(
         return {}
 
     # call redis and get the value
-    info_contents = await app.state.redis_connection4.mget(*canonical_nonan, encoding='utf8')
+    info_contents = await app.state.info_content_db.mget(*canonical_nonan, encoding='utf8')
 
     # get this into a list
     info_contents = [round(float(ic_ids), 1) if ic_ids is not None else None for ic_ids in info_contents]
@@ -515,9 +505,9 @@ async def get_eqids_and_types(
     batch_size = int(os.environ.get("EQ_BATCH_SIZE", 2500))
     eqids = []
     for i in range(0, len(canonical_nonan), batch_size):
-        eqids += await app.state.redis_connection1.mget(*canonical_nonan[i:i+batch_size], encoding='utf-8')
+        eqids += await app.state.id_to_eqids_db.mget(*canonical_nonan[i:i + batch_size], encoding='utf-8')
     eqids = [json.loads(value) if value is not None else [None] for value in eqids]
-    types = await app.state.redis_connection2.mget(*canonical_nonan, encoding='utf-8')
+    types = await app.state.id_to_type_db.mget(*canonical_nonan, encoding='utf-8')
     types_with_ancestors = []
     for index, typ in enumerate(types):
         if not typ:
@@ -526,6 +516,11 @@ async def get_eqids_and_types(
             types_with_ancestors.append([BIOLINK_NAMED_THING])
         else:
             types_with_ancestors.append(get_ancestors(app, typ))
+
+        # Every equivalent identifier here has the same type.
+        for eqid in eqids[index]:
+            eqid.update({'types': [typ]})
+
     return eqids, types_with_ancestors
 
 
@@ -534,11 +529,17 @@ async def get_normalized_nodes(
         curies: List[Union[CURIE, str]],
         conflate_gene_protein: bool,
         conflate_chemical_drug: bool,
-        include_descriptions: bool = False
+        include_descriptions: bool = False,
+        include_individual_types: bool = True,
+        include_taxa: bool = True,
 ) -> Dict[str, Optional[str]]:
     """
     Get value(s) for key(s) using redis MGET
     """
+
+    # Time how long this query takes.
+    start_time = time.time_ns()
+
     # malkovich malkovich
     curies = [
         curie.__root__ if isinstance(curie, CURIE) else curie
@@ -551,99 +552,106 @@ async def get_normalized_nodes(
     # conflation_redis = 5
 
     upper_curies = [c.upper() for c in curies]
-    try:
-        canonical_ids = await app.state.redis_connection0.mget(*upper_curies, encoding='utf-8')
-        canonical_nonan = [canonical_id for canonical_id in canonical_ids if canonical_id is not None]
-        info_contents = {}
+    canonical_ids = await app.state.eq_id_to_id_db.mget(*upper_curies, encoding='utf-8')
+    canonical_nonan = [canonical_id for canonical_id in canonical_ids if canonical_id is not None]
+    info_contents = {}
 
-        # did we get some canonical ids
-        if canonical_nonan:
-            # get the information content values
-            info_contents = await get_info_content(app, canonical_nonan)
+    # did we get some canonical ids
+    if canonical_nonan:
+        # get the information content values
+        info_contents = await get_info_content(app, canonical_nonan)
 
-            # Get the equivalent_ids and types
-            eqids, types = await get_eqids_and_types(app, canonical_nonan)
+        # Get the equivalent_ids and types
+        eqids, types = await get_eqids_and_types(app, canonical_nonan)
 
-            # are we looking for conflated values
-            if conflate_gene_protein or conflate_chemical_drug:
-                other_ids = []
+        # are we looking for conflated values
+        if conflate_gene_protein or conflate_chemical_drug:
+            other_ids = []
 
-                if conflate_gene_protein:
-                    other_ids.extend(await app.state.redis_connection5.mget(*canonical_nonan, encoding='utf8'))
+            if conflate_gene_protein:
+                other_ids.extend(await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8'))
 
-                # logger.error(f"After conflate_gene_protein: {other_ids}")
+            # logger.error(f"After conflate_gene_protein: {other_ids}")
 
-                if conflate_chemical_drug:
-                    other_ids.extend(await app.state.redis_connection6.mget(*canonical_nonan, encoding='utf8'))
+            if conflate_chemical_drug:
+                other_ids.extend(await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8'))
 
-                # logger.error(f"After conflate_chemical_drug: {other_ids}")
+            # logger.error(f"After conflate_chemical_drug: {other_ids}")
 
-                # if there are other ids, then we want to rebuild eqids and types.  That's because even though we have them,
-                # they're not necessarily first.  For instance if what came in and got canonicalized was a protein id
-                # and we want gene first, then we're relying on the order of the other_ids to put it back in the right place.
-                other_ids = [json.loads(oids) if oids else [] for oids in other_ids]
+            # if there are other ids, then we want to rebuild eqids and types.  That's because even though we have them,
+            # they're not necessarily first.  For instance if what came in and got canonicalized was a protein id
+            # and we want gene first, then we're relying on the order of the other_ids to put it back in the right place.
+            other_ids = [json.loads(oids) if oids else [] for oids in other_ids]
 
-                # Until we added conflate_chemical_drug, canonical_nonan and other_ids would always have the same
-                # length, so we could figure out mappings from one to the other just by doing:
-                #   dereference_others = dict(zip(canonical_nonan, other_ids))
-                # Now that we have (potentially multiple) results to associate with each identifier, we need
-                # something a bit more sophisticated.
-                # - We use a defaultdict with set so that we can deduplicate identifiers here.
-                # - We use itertools.cycle() because len(canonical_nonan) will be <= len(other_ids), but we can be sure
-                #   that each conflation method will return a list of identifiers (e.g. if gene_conflation returns nothing
-                #   for two queries, other_ids = [[], [], ...]. By cycling through canonical_nonan, we can assign each
-                #   result to the correct query for each conflation method.
-                dereference_others = collections.defaultdict(list)
-                for canon, oids in zip(itertools.cycle(canonical_nonan), other_ids):
-                    dereference_others[canon].extend(oids)
+            # Until we added conflate_chemical_drug, canonical_nonan and other_ids would always have the same
+            # length, so we could figure out mappings from one to the other just by doing:
+            #   dereference_others = dict(zip(canonical_nonan, other_ids))
+            # Now that we have (potentially multiple) results to associate with each identifier, we need
+            # something a bit more sophisticated.
+            # - We use a defaultdict with set so that we can deduplicate identifiers here.
+            # - We use itertools.cycle() because len(canonical_nonan) will be <= len(other_ids), but we can be sure
+            #   that each conflation method will return a list of identifiers (e.g. if gene_conflation returns nothing
+            #   for two queries, other_ids = [[], [], ...]. By cycling through canonical_nonan, we can assign each
+            #   result to the correct query for each conflation method.
+            dereference_others = collections.defaultdict(list)
+            for canon, oids in zip(itertools.cycle(canonical_nonan), other_ids):
+                dereference_others[canon].extend(oids)
 
-                all_other_ids = sum(other_ids, [])
-                eqids2, types2 = await get_eqids_and_types(app, all_other_ids)
+            all_other_ids = sum(other_ids, [])
+            eqids2, types2 = await get_eqids_and_types(app, all_other_ids)
 
-                # logger.error(f"other_ids = {other_ids}")
-                # logger.error(f"dereference_others = {dereference_others}")
-                # logger.error(f"all_other_ids = {all_other_ids}")
+            # logger.error(f"other_ids = {other_ids}")
+            # logger.error(f"dereference_others = {dereference_others}")
+            # logger.error(f"all_other_ids = {all_other_ids}")
 
-                final_eqids = []
-                final_types = []
+            final_eqids = []
+            final_types = []
 
-                deref_others_eqs = dict(zip(all_other_ids, eqids2))
-                deref_others_typ = dict(zip(all_other_ids, types2))
+            deref_others_eqs = dict(zip(all_other_ids, eqids2))
+            deref_others_typ = dict(zip(all_other_ids, types2))
 
-                zipped = zip(canonical_nonan, eqids, types)
+            zipped = zip(canonical_nonan, eqids, types)
 
-                for canonical_id, e, t in zipped:
-                    # here's where we replace the eqids, types
-                    if len(dereference_others[canonical_id]) > 0:
-                        e = []
-                        t = []
+            for canonical_id, e, t in zipped:
+                # here's where we replace the eqids, types
+                if len(dereference_others[canonical_id]) > 0:
+                    e = []
+                    t = []
 
-                    for other in dereference_others[canonical_id]:
-                        # logging.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
-                        e += deref_others_eqs[other]
-                        t += deref_others_typ[other]
+                for other in dereference_others[canonical_id]:
+                    # logging.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
+                    e += deref_others_eqs[other]
+                    t += deref_others_typ[other]
 
-                    final_eqids.append(e)
-                    final_types.append(uniquify_list(t))
+                final_eqids.append(e)
+                final_types.append(uniquify_list(t))
 
-                dereference_ids = dict(zip(canonical_nonan, final_eqids))
-                dereference_types = dict(zip(canonical_nonan, final_types))
-            else:
-                dereference_ids = dict(zip(canonical_nonan, eqids))
-                dereference_types = dict(zip(canonical_nonan, types))
+            dereference_ids = dict(zip(canonical_nonan, final_eqids))
+            dereference_types = dict(zip(canonical_nonan, final_types))
         else:
-            dereference_ids = dict()
-            dereference_types = dict()
+            dereference_ids = dict(zip(canonical_nonan, eqids))
+            dereference_types = dict(zip(canonical_nonan, types))
+    else:
+        dereference_ids = dict()
+        dereference_types = dict()
 
-        # output the final result
-        normal_nodes = {
-            input_curie: await create_node(canonical_id, dereference_ids, dereference_types, info_contents, include_descriptions=include_descriptions)
-            for input_curie, canonical_id in zip(curies, canonical_ids)
-        }
+    # output the final result
+    normal_nodes = {
+        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
+                                       include_descriptions=include_descriptions,
+                                       include_individual_types=include_individual_types,
+                                       include_taxa=include_taxa,
+                                       conflations={
+                                           'GeneProtein': conflate_gene_protein,
+                                           'DrugChemical': conflate_chemical_drug,
+                                       })
+        for input_curie, canonical_id in zip(curies, canonical_ids)
+    }
 
-    except Exception as e:
-        exception_str = "".join(traceback.format_exc())
-        logger.error(f'Exception: {exception_str}')
+    end_time = time.time_ns()
+    logger.info(f"Normalized {len(curies)} nodes in {(end_time - start_time)/1_000_000:.2f} ms with arguments " +
+                f"(curies={curies}, conflate_gene_protein={conflate_gene_protein}, conflate_chemical_drug={conflate_chemical_drug}, " +
+                f"include_descriptions={include_descriptions}, include_individual_types={include_individual_types})")
 
     return normal_nodes
 
@@ -657,7 +665,7 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     :return:
     """
     # get the information content value
-    ic_val = await app.state.redis_connection4.get(canonical_nonan, encoding='utf8')
+    ic_val = await app.state.info_content_db.get(canonical_nonan, encoding='utf8')
 
     # did we get a good value
     if ic_val is not None:
@@ -672,11 +680,16 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     return new_attrib
 
 
-async def create_node(canonical_id, equivalent_ids, types, info_contents, include_descriptions=True):
+async def create_node(app, canonical_id, equivalent_ids, types, info_contents, include_descriptions=True,
+                      include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
     if canonical_id is None:
         return None
+
+    # If no conflation information was provided, assume it's empty.
+    if conflations is None:
+        conflations = {}
 
     # If we have 'None' in the equivalent IDs, skip it so we don't confuse things further down the line.
     if None in equivalent_ids[canonical_id]:
@@ -698,55 +711,122 @@ async def create_node(canonical_id, equivalent_ids, types, info_contents, includ
     # As per https://github.com/TranslatorSRI/Babel/issues/158, we select the first label from any
     # identifier _except_ where one of the types is in preferred_name_boost_prefixes, in which case
     # we prefer the prefixes listed there.
-    labels = list(filter(lambda x: len(x) > 0, [eid['l'] for eid in eids if 'l' in eid]))
+    #
+    # This should perfectly replicate NameRes labels for non-conflated cliques, but it WON'T perfectly
+    # match conflated cliques. To do that, we need to run the preferred label algorithm on ONLY the labels
+    # for the FIRST clique of the conflated cliques with labels.
+    any_conflation = any(conflations.values())
+    if not any_conflation:
+        # No conflation. We just use the identifiers we've been given.
+        identifiers_with_labels = eids
+    else:
+        # We have a conflation going on! To replicate Babel's behavior, we need to run the algorithem
+        # on the list of labels corresponding to the first
+        # So we need to run the algorithm on the first set of identifiers that have any
+        # label whatsoever.
+        identifiers_with_labels = []
+        curies_already_checked = set()
+        for identifier in eids:
+            curie = identifier.get('i', '')
+            if curie in curies_already_checked:
+                continue
+            results, _ = await get_eqids_and_types(app, [curie])
+
+            identifiers_with_labels = results[0]
+            labels = map(lambda ident: ident.get('l', ''), identifiers_with_labels)
+            if any(map(lambda l: l != '', labels)):
+                break
+
+            # Since we didn't get any matches here, add it to the list of CURIEs already checked so
+            # we don't make redundant queries to the database.
+            curies_already_checked.update(set(map(lambda x: x.get('i', ''), identifiers_with_labels)))
+
+        # We might get here without any labels, which is fine. At least we tried.
+
+    # At this point:
+    #   - eids will be the full list of all identifiers and labels in this clique.
+    #   - identifiers_with_labels is the list of identifiers and labels for the first subclique that has at least
+    #     one label.
 
     # Note that types[canonical_id] goes from most specific to least specific, so we
     # need to reverse it in order to apply preferred_name_boost_prefixes for the most
     # specific type.
+    possible_labels = []
     for typ in types[canonical_id][::-1]:
         if typ in config['preferred_name_boost_prefixes']:
-            # This is the most specific matching type, so we use this.
-            labels = map(lambda identifier: identifier.get('l', ''),
+            # This is the most specific matching type, so we use this and then break.
+            possible_labels = list(map(lambda ident: ident.get('l', ''),
                                   sort_identifiers_with_boosted_prefixes(
-                                      eids,
+                                      identifiers_with_labels,
                                       config['preferred_name_boost_prefixes'][typ]
-                                  ))
+                                  )))
+
+            # Add in all the other labels -- we'd still like to consider them, but at a lower priority.
+            for eid in identifiers_with_labels:
+                label = eid.get('l', '')
+                if label not in possible_labels:
+                    possible_labels.append(label)
+
+            # Since this is the most specific matching type, we shouldn't do other (presumably higher-level)
+            # categories: so let's break here.
             break
 
-    # Filter out unsuitable labels.
-    labels = [l for l in labels if
-              l and                               # Ignore blank or empty names.
-              not l.startswith('CHEMBL')          # Some CHEMBL names are just the identifier again.
-              ]
+    # Step 1.2. If we didn't have a preferred_name_boost_prefixes, just use the identifiers in their
+    # Biolink prefix order.
+    if not possible_labels:
+        possible_labels = map(lambda eid: eid.get('l', ''), identifiers_with_labels)
+
+    # Step 2. Filter out any suspicious labels.
+    filtered_possible_labels = [l for l in possible_labels if
+        l and                               # Ignore blank or empty names.
+        not l.startswith('CHEMBL')          # Some CHEMBL names are just the identifier again.
+        ]
+
+    # Step 3. Filter out labels longer than config['demote_labels_longer_than'], but only if there is at
+    # least one label shorter than this limit.
+    labels_shorter_than_limit = [l for l in filtered_possible_labels if l and len(l) <= config['demote_labels_longer_than']]
+    if labels_shorter_than_limit:
+        filtered_possible_labels = labels_shorter_than_limit
 
     # Note that the id will be from the equivalent ids, not the canonical_id.  This is to handle conflation
-    if len(labels) > 0:
-        node = {"id": {"identifier": eids[0]['i'], "label": labels[0]}}
+    if len(filtered_possible_labels) > 0:
+        node = {"id": {"identifier": eids[0]['i'], "label": filtered_possible_labels[0]}}
     else:
         # Sometimes, nothing has a label :(
         node = {"id": {"identifier": eids[0]['i']}}
 
-    # if descriptions are enabled look for the first available description and use that 
-    if include_descriptions:
-        descriptions = list(
-            map(
-                lambda x: x[0],
-                filter(lambda x: len(x) > 0, [eid['d'] for eid in eids if 'd' in eid])
-                )
-        )
-        if len(descriptions) > 0:
-            node["id"]["description"] = descriptions[0]
+    # Now that we've determined a label for this clique, we should never use identifiers_with_labels, possible_labels,
+    # or filtered_possible_labels after this point.
 
     # now need to reformat the identifier keys.  It could be cleaner but we have to worry about if there is a label
+    descriptions = []
+    node_taxa = set()
     node["equivalent_identifiers"] = []
     for eqid in eids:
         eq_item = {"identifier": eqid["i"]}
-        if "l" in eqid:
+        if "l" in eqid and eqid["l"]:
             eq_item["label"] = eqid["l"]
-        # if descriptions is enabled and exist add them to each eq_id entry
-        if include_descriptions and "d" in eqid and len(eqid["d"]):
-            eq_item["description"] = eqid["d"][0]
+        # if descriptions is enabled, add it to descriptions.
+        if include_descriptions and "d" in eqid and len(eqid["d"]) > 0:
+            desc = eqid["d"][0]
+            eq_item["description"] = desc
+            if desc not in descriptions:
+                descriptions.append(desc)
+        # if include_taxa is enabled and we have taxa on this node, add them to every eq_id entry
+        if include_taxa and "t" in eqid and eqid["t"]:
+            eq_item["taxa"] = eqid["t"]
+            node_taxa.update(eqid["t"])
+        # if individual types have been requested, add them too.
+        if include_individual_types and 'types' in eqid:
+            eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
+
+    if include_descriptions and descriptions:
+        node["descriptions"] = descriptions
+        node["id"]["description"] = descriptions[0]
+
+    if include_taxa and node_taxa:
+        node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/TranslatorSRI/NodeNormalization/issues/173)
@@ -771,39 +851,35 @@ async def get_curie_prefixes(
     """
     ret_val: dict = {}  # storage for the returned data
 
-    try:
-        # was an arg passed in
-        if semantic_types:
-            for item in semantic_types:
-                # get the curies for this type
-                curies = await app.state.redis_connection3.get(item, encoding='utf-8')
+    # was an arg passed in
+    if semantic_types:
+        for item in semantic_types:
+            # get the curies for this type
+            curies = await app.state.curie_to_bl_type_db.get(item, encoding='utf-8')
 
-                # did we get any data
-                if not curies:
-                    curies = '{' + f'"{item}"' + ': "Not found"}'
+            # did we get any data
+            if not curies:
+                curies = '{' + f'"{item}"' + ': "Not found"}'
 
-                curies = json.loads(curies)
+            curies = json.loads(curies)
 
-                # set the return data
-                ret_val[item] = {'curie_prefix': curies}
-        else:
-            types = await app.state.redis_connection3.lrange('semantic_types', 0, -1, encoding='utf-8')
+            # set the return data
+            ret_val[item] = {'curie_prefix': curies}
+    else:
+        types = await app.state.curie_to_bl_type_db.lrange('semantic_types', 0, -1, encoding='utf-8')
 
-            for item in types:
-                # get the curies for this type
-                curies = await app.state.redis_connection3.get(item, encoding='utf-8')
+        for item in types:
+            # get the curies for this type
+            curies = await app.state.curie_to_bl_type_db.get(item, encoding='utf-8')
 
-                # did we get any data
-                if not curies:
-                    curies = '{' + f'"{item}"' + ': "Not found"}'
+            # did we get any data
+            if not curies:
+                curies = '{' + f'"{item}"' + ': "Not found"}'
 
-                curies = json.loads(curies)
+            curies = json.loads(curies)
 
-                # set the return data
-                ret_val[item] = {'curie_prefix': curies}
-    except Exception as e:
-        exception_str = "".join(traceback.format_exc())
-        logger.error(f'Exception: {exception_str}')
+            # set the return data
+            ret_val[item] = {'curie_prefix': curies}
 
     return ret_val
 
@@ -815,35 +891,31 @@ def _merge_node_attributes(node_a: Dict, node_b, merged_count: int) -> Dict:
     :param merged_count: the number of nodes merged into node_a **upon entering this fx**
     """
 
-    try:
-        if not ('attributes' in node_b and node_b['attributes']):
-            return node_a
+    if not ('attributes' in node_b and node_b['attributes']):
+        return node_a
 
-        if merged_count == 0:
-            if 'attributes' in node_a and node_a['attributes']:
-                new_attribute_list = []
-                for attribute in node_a['attributes']:
-                    new_dict = {}
-                    for k, v in attribute.items():
-                        new_dict[f"{k}.1"] = v
-                    new_attribute_list.append(new_dict)
-
-                node_a['attributes'] = new_attribute_list
-
-        # Need to DRY this off
-        b_attr_id = merged_count + 2
-        if 'attributes' in node_b and node_b['attributes']:
+    if merged_count == 0:
+        if 'attributes' in node_a and node_a['attributes']:
             new_attribute_list = []
-            for attribute in node_b['attributes']:
+            for attribute in node_a['attributes']:
                 new_dict = {}
                 for k, v in attribute.items():
-                    new_dict[f"{k}.{b_attr_id}"] = v
+                    new_dict[f"{k}.1"] = v
                 new_attribute_list.append(new_dict)
 
-            node_a['attributes'] = node_a['attributes'] + new_attribute_list
-    except Exception as e:
-        exception_str = "".join(traceback.format_exc())
-        logger.error(f'Exception: {exception_str}')
+            node_a['attributes'] = new_attribute_list
+
+    # Need to DRY this off
+    b_attr_id = merged_count + 2
+    if 'attributes' in node_b and node_b['attributes']:
+        new_attribute_list = []
+        for attribute in node_b['attributes']:
+            new_dict = {}
+            for k, v in attribute.items():
+                new_dict[f"{k}.{b_attr_id}"] = v
+            new_attribute_list.append(new_dict)
+
+        node_a['attributes'] = node_a['attributes'] + new_attribute_list
 
     return node_a
 

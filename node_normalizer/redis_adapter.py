@@ -104,6 +104,35 @@ class RedisConnection:
             self.connector: aioredis.commands.Redis
             return await self.connector.get(key, encoding=encoding)
 
+    async def dbsize(self):
+        """
+        :return: The number of keys in this Redis database.
+        """
+        if isinstance(self.connector, RedisCluster):
+            self.connector: RedisCluster
+            return self.connector.dbsize()
+        elif isinstance(self.connector, aioredis.commands.Redis):
+            self.connector: aioredis.commands.Redis
+            return await self.connector.dbsize()
+
+    async def info(self, section):
+        """
+        :return: The info of this Redis database.
+        """
+        if isinstance(self.connector, RedisCluster):
+            self.connector: RedisCluster
+            return self.connector.info(section)
+        elif isinstance(self.connector, aioredis.commands.Redis):
+            self.connector: aioredis.commands.Redis
+            return await self.connector.info(section)
+
+    async def used_memory_rss_human(self):
+        """
+        :return: The used memory in human units (e.g. 66.71G)
+        """
+        return (await self.info('memory')).get('memory').get('used_memory_rss_human')
+
+
     def close(self):
         """
         Close underlying connection.

@@ -71,7 +71,7 @@ def construct_open_api_schema(app) -> Dict[str, str]:
     if 'servers' in api_docs:
         for s in api_docs['servers']:
             # override if server root env var is provided
-            s['url'] = server_root + os.environ.get("TRAPI_VERSION", "1.4") if server_root != '/' else s['url']
+            s['url'] = server_root + os.environ.get("TRAPI_VERSION", "1.5") if server_root != '/' else s['url']
             s['x-maturity'] = os.environ.get("MATURITY_VALUE", "maturity")
             s['x-location'] = os.environ.get("LOCATION_VALUE", "location")
         open_api_schema['servers'] = api_docs['servers']

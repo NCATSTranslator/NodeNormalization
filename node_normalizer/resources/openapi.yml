@@ -1,7 +1,7 @@
 openapi: 3.0.2
 info:
   title: Node Normalization
-  version: 2.3.9
+  version: 2.3.28
   contact:
     email: bizon@renci.org
     name: Chris Bizon
@@ -26,7 +26,7 @@ info:
       - Standards Reference Implementation Team
     infores: "infores:sri-node-normalizer"
   x-trapi:
-    version: 1.4.0
+    version: 1.5.0
     operations:
       - annotate_nodes
 

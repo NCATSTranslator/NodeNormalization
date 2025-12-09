@@ -105,7 +105,8 @@ The web server can be started after successful completion of the load.
     uvicorn --host 0.0.0.0 --port 8000 --workers 1 node_normalizer.server:app
 ```
 
-Then navigate to http://localhost:8000/docs to run the application
+Then navigate to http://localhost:8000/docs to run the application.
+Documentation for the [NodeNorm API](./documentation/API.md) is available.
 
 ### Webserver Docker container creation and execution
 Much like the Redis Docker container noted above, a Docker container can also be created and executed to run the webserver.

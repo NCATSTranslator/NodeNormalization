@@ -4,7 +4,7 @@ API Input Models not described in reasoner-pydantic
 
 from pydantic import BaseModel, Field
 
-from typing import List
+from typing import List, Dict
 
 
 class CurieList(BaseModel):
@@ -29,6 +29,16 @@ class CurieList(BaseModel):
     drug_chemical_conflate: bool = Field(
         False,
         title="Whether to apply drug/chemical conflation"
+    )
+
+    individual_types: bool = Field(
+        False,
+        title="Whether to return individual types for equivalent identifiers"
+    )
+
+    include_taxa: bool = Field(
+        True,
+        title="Whether to return taxa for equivalent identifiers"
     )
 
     class Config:
@@ -56,3 +66,26 @@ class SemanticTypesInput(BaseModel):
                 "semantic_types": ['biolink:ChemicalEntity', 'biolink:AnatomicalEntity']
             }
         }
+
+
+class SetIDQuery(BaseModel):
+    """ Query for a single SetID. Includes a set of CURIEs as well as a set of conflations to apply. """
+
+    curies: List[str] = Field(
+        ...,  # Ellipsis means field is required
+        description="Set of curies to normalize",
+        example=["MESH:D014867", "NCIT:C34373"],
+    )
+
+    conflations: List[str] = Field(
+        [],
+        description="Set of conflations to apply",
+        example=["GeneProtein", "DrugChemical"],
+    )
+
+
+class SetIDs(BaseModel):
+    """ Query for Set IDs. You can provide a set of named CURIE sets, and we return a response for each one. """
+    sets: Dict[str, SetIDQuery] = Field(
+        description="A list of ",
+    )

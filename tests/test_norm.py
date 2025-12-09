@@ -18,17 +18,17 @@ class MockRedis:
 
 
 # Id -> Canonical
-app.state.redis_connection0 = MockRedis(
+app.state.eq_id_to_id_db = MockRedis(
     {"DOID:3812": "MONDO:0005002", "MONDO:0005002": "MONDO:0005002"}
 )
 # Canonical->Equiv
-app.state.redis_connection1 = MockRedis(
+app.state.id_to_eqids_db = MockRedis(
     {"MONDO:0005002": json.dumps([{"i": "MONDO:0005002"}, {"i": "DOID:3812"}])}
 )
-app.state.redis_connection2 = MockRedis({"MONDO:0005002": "biolink:Disease"})
-app.state.redis_connection3 = MockRedis({})
-app.state.redis_connection4 = MockRedis({})
-app.state.redis_connection5 = MockRedis({})
+app.state.id_to_type_db = MockRedis({"MONDO:0005002": "biolink:Disease"})
+app.state.curie_to_bl_type_db = MockRedis({})
+app.state.info_content_db = MockRedis({})
+app.state.gene_protein_db = MockRedis({})
 #app.state.ancestor_map = {"biolink:Disease": ["biolink:Disease", "biolink:NamedThing"]}
 app.state.toolkit = Toolkit()
 app.state.ancestor_map = {}

@@ -816,12 +816,6 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
         eq_item = {"identifier": eqid["i"]}
         if "l" in eqid and eqid["l"]:
             eq_item["label"] = eqid["l"]
-            if clique_leaders and eqid["i"] in clique_leaders:
-                clique_leaders_output[eqid["i"]] = {
-                    "identifier": eqid["i"],
-                    "label": eqid["l"],
-                    "biolink_type": types.get(eqid["i"], ["UNKNOWN"])[0],
-                }
         # if descriptions is enabled, add it to descriptions.
         if include_descriptions and "d" in eqid and len(eqid["d"]) > 0:
             desc = eqid["d"][0]
@@ -837,6 +831,15 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
+        if clique_leaders and eqid["i"] in clique_leaders:
+            clique_leaders_output[eqid["i"]] = {
+                "identifier": eqid["i"],
+                "label": eq_item.get("label", ""),
+                "description": eq_item.get("description", ""),
+                "taxa": eq_item.get("taxa", []),
+                "type": eq_item.get("type", "UNKNOWN")
+            }
+
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions
         node["id"]["description"] = descriptions[0]
@@ -848,7 +851,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
     if clique_leaders:
         # If there are any clique leader IDs we haven't included in clique_leaders_output,
         # insert it anyway at this point. This shouldn't happen, but let's be careful.
-        missing_clique_leaders = (clique_leaders_output.keys() - clique_leaders)
+        missing_clique_leaders = (clique_leaders - clique_leaders_output.keys())
         for cl_id in missing_clique_leaders:
             clique_leaders_output[cl_id] = {"identifier": cl_id, "biolink_type": types.get(cl_id, ["UNKNOWN"])[0]}
         node["clique_leaders"] = clique_leaders_output

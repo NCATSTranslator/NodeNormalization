@@ -532,6 +532,7 @@ async def get_normalized_nodes(
         include_descriptions: bool = False,
         include_individual_types: bool = True,
         include_taxa: bool = True,
+        include_clique_leaders: bool = False,
 ) -> Dict[str, Optional[str]]:
     """
     Get value(s) for key(s) using redis MGET
@@ -555,6 +556,7 @@ async def get_normalized_nodes(
     canonical_ids = await app.state.eq_id_to_id_db.mget(*upper_curies, encoding='utf-8')
     canonical_nonan = [canonical_id for canonical_id in canonical_ids if canonical_id is not None]
     info_contents = {}
+    clique_leaders = {}
 
     # did we get some canonical ids
     if canonical_nonan:
@@ -569,14 +571,18 @@ async def get_normalized_nodes(
             other_ids = []
 
             if conflate_gene_protein:
-                other_ids.extend(await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8'))
+                gene_protein_clique_leaders = await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8')
+                other_ids.extend(gene_protein_clique_leaders)
+                clique_leaders.update(zip(canonical_nonan, gene_protein_clique_leaders))
 
             # logger.error(f"After conflate_gene_protein: {other_ids}")
 
             if conflate_chemical_drug:
-                other_ids.extend(await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8'))
+                drug_chemical_clique_leaders = await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8')
+                other_ids.extend(drug_chemical_clique_leaders)
+                clique_leaders.update(zip(canonical_nonan, drug_chemical_clique_leaders))
 
-            # logger.error(f"After conflate_chemical_drug: {other_ids}")
+        # logger.error(f"After conflate_chemical_drug: {other_ids}")
 
             # if there are other ids, then we want to rebuild eqids and types.  That's because even though we have them,
             # they're not necessarily first.  For instance if what came in and got canonicalized was a protein id
@@ -635,9 +641,13 @@ async def get_normalized_nodes(
         dereference_ids = dict()
         dereference_types = dict()
 
+    # Don't write out clique leaders unless its requested.
+    if not include_clique_leaders:
+        clique_leaders = None
+
     # output the final result
     normal_nodes = {
-        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
+        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents, clique_leaders,
                                        include_descriptions=include_descriptions,
                                        include_individual_types=include_individual_types,
                                        include_taxa=include_taxa,
@@ -680,7 +690,7 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     return new_attrib
 
 
-async def create_node(app, canonical_id, equivalent_ids, types, info_contents, include_descriptions=True,
+async def create_node(app, canonical_id, equivalent_ids, types, info_contents, clique_leaders, include_descriptions=True,
                       include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
@@ -827,6 +837,16 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
 
     if include_taxa and node_taxa:
         node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)
+
+    # Add clique leaders if available.
+    if clique_leaders:
+        clique_leaders_for_node = clique_leaders.get(canonical_id, [])
+        clique_leaders_with_labels_and_types = [{
+            'identifier': cl,
+            'labels': [eid['l'] for eid in eids if eid['i'] == cl],
+            'types': [eid['t'] for eid in eids if eid['i'] == cl],
+        } for cl in clique_leaders_for_node]
+        node["clique_leaders"] = clique_leaders_with_labels_and_types
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/TranslatorSRI/NodeNormalization/issues/173)

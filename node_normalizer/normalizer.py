@@ -571,25 +571,27 @@ async def get_normalized_nodes(
             other_ids = []
 
             if conflate_gene_protein:
-                gene_protein_clique_leaders = await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8')
+                gene_protein_clique_leaders_strings = await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8')
+                gene_protein_clique_leaders = [json.loads(oids) if oids else [] for oids in gene_protein_clique_leaders_strings]
                 other_ids.extend(gene_protein_clique_leaders)
                 if include_clique_leaders:
-                    clique_leaders.update(zip(canonical_nonan, json.loads(gene_protein_clique_leaders)))
+                    clique_leaders.update(zip(canonical_nonan, gene_protein_clique_leaders))
 
             # logger.error(f"After conflate_gene_protein: {other_ids}")
 
             if conflate_chemical_drug:
-                drug_chemical_clique_leaders = await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8')
+                drug_chemical_clique_leaders_strings = await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8')
+                drug_chemical_clique_leaders = [json.loads(oids) if oids else [] for oids in drug_chemical_clique_leaders_strings]
                 other_ids.extend(drug_chemical_clique_leaders)
                 if include_clique_leaders:
-                    clique_leaders.update(zip(canonical_nonan, json.loads(drug_chemical_clique_leaders)))
+                    clique_leaders.update(zip(canonical_nonan, drug_chemical_clique_leaders))
 
-        # logger.error(f"After conflate_chemical_drug: {other_ids}")
+            # logger.error(f"After conflate_chemical_drug: {other_ids}")
 
             # if there are other ids, then we want to rebuild eqids and types.  That's because even though we have them,
             # they're not necessarily first.  For instance if what came in and got canonicalized was a protein id
             # and we want gene first, then we're relying on the order of the other_ids to put it back in the right place.
-            other_ids = [json.loads(oids) if oids else [] for oids in other_ids]
+            # other_ids = [json.loads(oids) if oids else [] for oids in other_ids]
 
             # Until we added conflate_chemical_drug, canonical_nonan and other_ids would always have the same
             # length, so we could figure out mappings from one to the other just by doing:

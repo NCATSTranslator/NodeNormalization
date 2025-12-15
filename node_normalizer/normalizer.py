@@ -731,8 +731,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
         identifiers_with_labels = eids
     else:
         # We have a conflation going on! To replicate Babel's behavior, we need to run the algorithem
-        # on the list of labels corresponding to the first
-        # So we need to run the algorithm on the first set of identifiers that have any
+        # on the list of labels corresponding to the first set of identifiers that have any
         # label whatsoever.
         identifiers_with_labels = []
         curies_already_checked = set()
@@ -810,12 +809,19 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
 
     # now need to reformat the identifier keys.  It could be cleaner but we have to worry about if there is a label
     descriptions = []
+    clique_leaders_output = {}
     node_taxa = set()
     node["equivalent_identifiers"] = []
     for eqid in eids:
         eq_item = {"identifier": eqid["i"]}
         if "l" in eqid and eqid["l"]:
             eq_item["label"] = eqid["l"]
+            if clique_leaders and eqid["i"] in clique_leaders:
+                clique_leaders_output[eqid["i"]] = {
+                    "identifier": eqid["i"],
+                    "label": eqid["l"],
+                    "biolink_type": types.get(eqid["i"], ["UNKNOWN"])[0],
+                }
         # if descriptions is enabled, add it to descriptions.
         if include_descriptions and "d" in eqid and len(eqid["d"]) > 0:
             desc = eqid["d"][0]
@@ -840,14 +846,12 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
 
     # Add clique leaders if available.
     if clique_leaders:
-        logger.info(f"Getting clique_leaders from {clique_leaders} for canonical ID {canonical_id}")
-        clique_leaders_for_node = clique_leaders.get(canonical_id, [])
-        clique_leaders_with_labels_and_types = [{
-            'identifier': cl,
-            'labels': [eid['l'] for eid in eids if eid['i'] == cl],
-            'types': [eid['t'] for eid in eids if eid['i'] == cl],
-        } for cl in clique_leaders_for_node]
-        node["clique_leaders"] = clique_leaders_with_labels_and_types
+        # If there are any clique leader IDs we haven't included in clique_leaders_output,
+        # insert it anyway at this point. This shouldn't happen, but let's be careful.
+        missing_clique_leaders = (clique_leaders_output.keys() - clique_leaders)
+        for cl_id in missing_clique_leaders:
+            clique_leaders_output[cl_id] = {"identifier": cl_id, "biolink_type": types.get(cl_id, ["UNKNOWN"])[0]}
+        node["clique_leaders"] = clique_leaders_output
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/TranslatorSRI/NodeNormalization/issues/173)

@@ -511,7 +511,7 @@ async def get_eqids_and_types(
     types_with_ancestors = []
     for index, typ in enumerate(types):
         if not typ:
-            logging.error(f"No type information found for '{canonical_nonan[index]}' with eqids: {eqids[index]}, "
+            logger.error(f"No type information found for '{canonical_nonan[index]}' with eqids: {eqids[index]}, "
                           f"replacing with {BIOLINK_NAMED_THING}")
             types_with_ancestors.append([BIOLINK_NAMED_THING])
         else:
@@ -625,7 +625,7 @@ async def get_normalized_nodes(
                     t = []
 
                 for other in dereference_others[canonical_id]:
-                    # logging.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
+                    # logger.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
                     e += deref_others_eqs[other]
                     t += deref_others_typ[other]
 
@@ -703,16 +703,16 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
 
     # If we have 'None' in the equivalent IDs, skip it so we don't confuse things further down the line.
     if None in equivalent_ids[canonical_id]:
-        logging.warning(f"Skipping None in canonical ID {canonical_id} among eqids: {equivalent_ids}")
+        logger.warning(f"Skipping None in canonical ID {canonical_id} among eqids: {equivalent_ids}")
         equivalent_ids[canonical_id] = [x for x in equivalent_ids[canonical_id] if x is not None]
         if not equivalent_ids[canonical_id]:
-            logging.warning(f"No non-None values found for ID {canonical_id} among filtered eqids: {equivalent_ids}")
+            logger.warning(f"No non-None values found for ID {canonical_id} among filtered eqids: {equivalent_ids}")
             return None
 
     # If we have 'None' in the canonical types, something went horribly wrong (specifically: we couldn't
     # find the type information for all the eqids for this clique). Return None.
     if None in types[canonical_id]:
-        logging.error(f"No types found for canonical ID {canonical_id} among types: {types}")
+        logger.error(f"No types found for canonical ID {canonical_id} among types: {types}")
         return None
 
     # OK, now we should have id's in the format [ {"i": "MONDO:12312", "l": "Scrofula"}, {},...]

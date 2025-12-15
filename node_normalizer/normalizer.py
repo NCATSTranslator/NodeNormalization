@@ -573,14 +573,14 @@ async def get_normalized_nodes(
             if conflate_gene_protein:
                 gene_protein_clique_leaders = await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8')
                 other_ids.extend(gene_protein_clique_leaders)
-                clique_leaders.update(zip(canonical_nonan, gene_protein_clique_leaders))
+                clique_leaders.update(zip(*canonical_nonan, gene_protein_clique_leaders))
 
             # logger.error(f"After conflate_gene_protein: {other_ids}")
 
             if conflate_chemical_drug:
                 drug_chemical_clique_leaders = await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8')
                 other_ids.extend(drug_chemical_clique_leaders)
-                clique_leaders.update(zip(canonical_nonan, drug_chemical_clique_leaders))
+                clique_leaders.update(zip(*canonical_nonan, drug_chemical_clique_leaders))
 
         # logger.error(f"After conflate_chemical_drug: {other_ids}")
 
@@ -661,7 +661,7 @@ async def get_normalized_nodes(
     end_time = time.time_ns()
     logger.info(f"Normalized {len(curies)} nodes in {(end_time - start_time)/1_000_000:.2f} ms with arguments " +
                 f"(curies={curies}, conflate_gene_protein={conflate_gene_protein}, conflate_chemical_drug={conflate_chemical_drug}, " +
-                f"include_descriptions={include_descriptions}, include_individual_types={include_individual_types})")
+                f"include_descriptions={include_descriptions}, include_individual_types={include_individual_types}, include_clique_leaders={include_clique_leaders})")
 
     return normal_nodes
 

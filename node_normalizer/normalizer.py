@@ -831,14 +831,16 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
-        if clique_leaders and eqid["i"] in clique_leaders:
-            clique_leaders_output[eqid["i"]] = {
-                "identifier": eqid["i"],
-                "label": eq_item.get("label", ""),
-                "description": eq_item.get("description", ""),
-                "taxa": eq_item.get("taxa", []),
-                "type": eq_item.get("type", "UNKNOWN")
-            }
+        if clique_leaders and canonical_id in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
+            clique_leaders_output[eqid["i"]] = { "identifier": eqid["i"] }
+            if "label" in eq_item:
+                clique_leaders_output[eqid["i"]]["label"] = eq_item["label"]
+            if "description" in eq_item:
+                clique_leaders_output[eqid["i"]]["description"] = eq_item["description"]
+            if "taxa" in eq_item:
+                clique_leaders_output[eqid["i"]]["taxa"] = eqid["taxa"]
+            if "type" in eq_item:
+                clique_leaders_output[eqid["i"]]["type"] = eqid["type"]
 
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions
@@ -849,12 +851,14 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
 
     # Add clique leaders if available.
     if clique_leaders:
-        # If there are any clique leader IDs we haven't included in clique_leaders_output,
-        # insert it anyway at this point. This shouldn't happen, but let's be careful.
-        missing_clique_leaders = (clique_leaders - clique_leaders_output.keys())
-        for cl_id in missing_clique_leaders:
-            clique_leaders_output[cl_id] = {"identifier": cl_id, "biolink_type": types.get(cl_id, ["UNKNOWN"])[0]}
-        node["clique_leaders"] = clique_leaders_output
+        node["clique_leaders"] = []
+        for cl_id in clique_leaders:
+            if cl_id in clique_leaders_output:
+                node["clique_leaders"].append(clique_leaders_output[cl_id])
+            else:
+                node["clique_leaders"].append({
+                    "identifier": cl_id,
+                })
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/TranslatorSRI/NodeNormalization/issues/173)

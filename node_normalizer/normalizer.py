@@ -840,6 +840,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
 
     # Add clique leaders if available.
     if clique_leaders:
+        logger.info(f"Getting clique_leaders from {clique_leaders} for canonical ID {canonical_id}")
         clique_leaders_for_node = clique_leaders.get(canonical_id, [])
         clique_leaders_with_labels_and_types = [{
             'identifier': cl,

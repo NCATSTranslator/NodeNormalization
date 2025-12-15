@@ -816,6 +816,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
         eq_item = {"identifier": eqid["i"]}
         if "l" in eqid and eqid["l"]:
             eq_item["label"] = eqid["l"]
+
         # if descriptions is enabled, add it to descriptions.
         if include_descriptions and "d" in eqid and len(eqid["d"]) > 0:
             desc = eqid["d"][0]
@@ -838,9 +839,9 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
             if "description" in eq_item:
                 clique_leaders_output[eqid["i"]]["description"] = eq_item["description"]
             if "taxa" in eq_item:
-                clique_leaders_output[eqid["i"]]["taxa"] = eqid["taxa"]
+                clique_leaders_output[eqid["i"]]["taxa"] = eq_item["taxa"]
             if "type" in eq_item:
-                clique_leaders_output[eqid["i"]]["type"] = eqid["type"]
+                clique_leaders_output[eqid["i"]]["type"] = eq_item["type"]
 
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions

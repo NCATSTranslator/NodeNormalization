@@ -573,14 +573,16 @@ async def get_normalized_nodes(
             if conflate_gene_protein:
                 gene_protein_clique_leaders = await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8')
                 other_ids.extend(gene_protein_clique_leaders)
-                clique_leaders.update(zip(*canonical_nonan, gene_protein_clique_leaders))
+                if include_clique_leaders:
+                    clique_leaders.update(zip(canonical_nonan, json.loads(gene_protein_clique_leaders)))
 
             # logger.error(f"After conflate_gene_protein: {other_ids}")
 
             if conflate_chemical_drug:
                 drug_chemical_clique_leaders = await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8')
                 other_ids.extend(drug_chemical_clique_leaders)
-                clique_leaders.update(zip(*canonical_nonan, drug_chemical_clique_leaders))
+                if include_clique_leaders:
+                    clique_leaders.update(zip(canonical_nonan, json.loads(drug_chemical_clique_leaders)))
 
         # logger.error(f"After conflate_chemical_drug: {other_ids}")
 
@@ -640,10 +642,6 @@ async def get_normalized_nodes(
     else:
         dereference_ids = dict()
         dereference_types = dict()
-
-    # Don't write out clique leaders unless its requested.
-    if not include_clique_leaders:
-        clique_leaders = None
 
     # output the final result
     normal_nodes = {

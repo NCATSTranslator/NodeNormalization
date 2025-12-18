@@ -52,6 +52,8 @@ loader = NodeLoader()
 
 redis_host = os.environ.get("REDIS_HOST", loader.get_config()["redis_host"])
 redis_port = os.environ.get("REDIS_PORT", loader.get_config()["redis_port"])
+BIOLINK_MODEL_VERSION = os.environ.get("BIOLINK_MODEL_VERSION", "master") # Note that this should be the complete Biolink Model tag, i.e. including the "v" prefix.
+BIOLINK_MODEL_URL = f"https://raw.githubusercontent.com/biolink/biolink-model/{BIOLINK_MODEL_VERSION}/biolink-model.yaml"
 
 async_query_tasks = set()
 
@@ -70,7 +72,7 @@ async def startup_event():
     app.state.info_content_db = connection_factory.get_connection(connection_id="info_content_db")
     app.state.gene_protein_db = connection_factory.get_connection(connection_id="gene_protein_db")
     app.state.chemical_drug_db = connection_factory.get_connection(connection_id="chemical_drug_db")
-    app.state.toolkit = Toolkit()
+    app.state.toolkit = Toolkit(BIOLINK_MODEL_URL)
     app.state.ancestor_map = {}
 
 

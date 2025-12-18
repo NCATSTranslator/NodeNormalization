@@ -123,6 +123,11 @@ async def status() -> Dict:
         "status": "running",
         "babel_version": babel_version,
         "babel_version_url": babel_version_url,
+        "biolink_model": {
+            "tag": BIOLINK_MODEL_TAG,
+            "url": f"https://github.com/biolink/biolink-model/tree/{BIOLINK_MODEL_TAG}",
+            "download_url": BIOLINK_MODEL_URL,
+        },
         "databases": {
             "eq_id_to_id_db": {
                 "dbname": "id-id",

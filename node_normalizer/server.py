@@ -73,6 +73,7 @@ async def startup_event():
     app.state.gene_protein_db = connection_factory.get_connection(connection_id="gene_protein_db")
     app.state.chemical_drug_db = connection_factory.get_connection(connection_id="chemical_drug_db")
     app.state.toolkit = Toolkit(BIOLINK_MODEL_URL)
+    logger.info(f"Initialized Biolink Model Toolkit ({app.state.toolkit}) from {BIOLINK_MODEL_URL} (based on tag: {BIOLINK_MODEL_TAG}).")
     app.state.ancestor_map = {}
 
 

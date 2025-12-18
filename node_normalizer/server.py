@@ -52,6 +52,8 @@ loader = NodeLoader()
 
 redis_host = os.environ.get("REDIS_HOST", loader.get_config()["redis_host"])
 redis_port = os.environ.get("REDIS_PORT", loader.get_config()["redis_port"])
+BIOLINK_MODEL_TAG = os.environ.get("BIOLINK_MODEL_TAG", "master") # Note that this should be a tag from the Biolink Model repo, e.g. "master" or "v4.3.6".
+BIOLINK_MODEL_URL = f"https://raw.githubusercontent.com/biolink/biolink-model/{BIOLINK_MODEL_TAG}/biolink-model.yaml"
 
 async_query_tasks = set()
 
@@ -70,7 +72,8 @@ async def startup_event():
     app.state.info_content_db = connection_factory.get_connection(connection_id="info_content_db")
     app.state.gene_protein_db = connection_factory.get_connection(connection_id="gene_protein_db")
     app.state.chemical_drug_db = connection_factory.get_connection(connection_id="chemical_drug_db")
-    app.state.toolkit = Toolkit()
+    app.state.toolkit = Toolkit(BIOLINK_MODEL_URL)
+    logger.info(f"Initialized Biolink Model Toolkit ({app.state.toolkit}) from {BIOLINK_MODEL_URL} (based on tag: {BIOLINK_MODEL_TAG}).")
     app.state.ancestor_map = {}
 
 
@@ -120,6 +123,11 @@ async def status() -> Dict:
         "status": "running",
         "babel_version": babel_version,
         "babel_version_url": babel_version_url,
+        "biolink_model": {
+            "tag": BIOLINK_MODEL_TAG,
+            "url": f"https://github.com/biolink/biolink-model/tree/{BIOLINK_MODEL_TAG}",
+            "download_url": BIOLINK_MODEL_URL,
+        },
         "databases": {
             "eq_id_to_id_db": {
                 "dbname": "id-id",

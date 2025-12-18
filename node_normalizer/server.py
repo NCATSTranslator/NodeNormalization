@@ -52,8 +52,8 @@ loader = NodeLoader()
 
 redis_host = os.environ.get("REDIS_HOST", loader.get_config()["redis_host"])
 redis_port = os.environ.get("REDIS_PORT", loader.get_config()["redis_port"])
-BIOLINK_MODEL_VERSION = os.environ.get("BIOLINK_MODEL_VERSION", "master") # Note that this should be the complete Biolink Model tag, i.e. including the "v" prefix.
-BIOLINK_MODEL_URL = f"https://raw.githubusercontent.com/biolink/biolink-model/{BIOLINK_MODEL_VERSION}/biolink-model.yaml"
+BIOLINK_MODEL_TAG = os.environ.get("BIOLINK_MODEL_TAG", "master") # Note that this should be a tag from the Biolink Model repo, e.g. "master" or "v4.3.6".
+BIOLINK_MODEL_URL = f"https://raw.githubusercontent.com/biolink/biolink-model/{BIOLINK_MODEL_TAG}/biolink-model.yaml"
 
 async_query_tasks = set()
 

@@ -44,10 +44,10 @@ class CurieList(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                "curies": ['MESH:D014867', 'NCIT:C34373'],
+                "curies": ['MESH:D014867', 'NCIT:C34373', 'NCBIGene:1756'],
                 "conflate": True,
                 "description": False,
-                "drug_chemical_conflate": False,
+                "drug_chemical_conflate": True,
             }
         }
 

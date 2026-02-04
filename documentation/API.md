@@ -51,6 +51,9 @@ Example output:
       },
       [...]
     ],
+    "descriptions": [
+      "An oxygen hydride consisting of an oxygen atom that is covalently bonded to two hydrogen atoms"
+    ],
     "type": [
       "biolink:SmallMolecule",
       "biolink:MolecularEntity",
@@ -82,6 +85,8 @@ Example output:
     Each identifier includes an `identifier` (a CURIE), a `label` (which corresponds to the label of the CURIE as per
     its authoritative source), a `description` (currently only taken from UberGraph), and (if `individual_types` is set)
     the Biolink type of each identifier. This list is ordered in the Biolink Model's preferred prefix order for this class.
+  * `descriptions`: a list of unique descriptions for the identifiers within this clique. This list is ordered in the same
+    order as `equivalent_identifiers`.
   * `type`: The list of Biolink classes for this clique, starting with the most specific type (in this example,
     `biolink:SmallMolecule`), and ending with any mixins that include this class.
   * `information_content`: the information content value between 0 and 100. This is calculated by retrieving the

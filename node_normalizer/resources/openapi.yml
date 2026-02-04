@@ -226,9 +226,9 @@ paths:
       - Interfaces
   /get_setid:
     get:
-      description: 'Returns the set ID for a given set of CURIEs. A set-id is an identifier that can be used to identify
-        this set of CURIEs going forward. It is currently impossible to recreate a set of CURIEs from a set-id, but the
-        same set of CURIEs given to the same version of Node Normalization will always return the same set-id.
+      description: 'Returns the set ID for a given set of CURIEs. A set ID is an identifier that can be used to identify
+        this set of CURIEs going forward. It is currently impossible to recreate a set of CURIEs from a set ID, but the
+        same set of CURIEs given to the same version of Node Normalization will always return the same set ID.
         You can read more about this endpoint in the
         <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_setid">NodeNorm API documentation</a>.'
       responses:

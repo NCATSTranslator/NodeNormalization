@@ -121,9 +121,10 @@ paths:
       - Interfaces
   /get_normalized_nodes:
     get:
-      description: 'Returns the equivalent identifiers and semantic types for the curie(s)
-        entered. You can read more about this endpoint in the
-        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_normalized_nodes">NodeNorm API documentation</a>. '
+      description: 'Returns the equivalent identifiers and semantic types for the CURIEs entered.
+        You can optionally <a href="https://github.com/NCATSTranslator/Babel/blob/master/docs/Conflation.md">conflate identifiers</a> if needed.
+        You can read more about this endpoint in the
+        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_normalized_nodes">NodeNorm API documentation</a>.'
       parameters:
       - in: query
         name: curie
@@ -192,8 +193,7 @@ paths:
                     information_content: 74.9
                 type: object
           description: Results
-      summary: Get the equivalent identifiers and semantic types for the curie(s)
-        entered.
+      summary: Get the equivalent identifiers and semantic types for the CURIEs entered.
       tags:
       - Interfaces
   /get_semantic_types:

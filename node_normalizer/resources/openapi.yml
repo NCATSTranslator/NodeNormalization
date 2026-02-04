@@ -72,8 +72,8 @@ paths:
         name: semantic_type
         schema:
           example:
-          - chemical_substance
-          - anatomical_entity
+          - biolink:ChemicalEntity
+          - biolink:AnatomicalEntity
           items:
             type: string
           type: array
@@ -83,16 +83,36 @@ paths:
             application/json:
               schema:
                 example:
-                  anatomical_entity:
+                  "biolink:ChemicalEntity":
                     curie_prefix:
-                      CHEBI: 1234,
-                      UNICHEM: 4567,
-                      etc.: the hit count
-                  chemical_substance:
+                      "PUBCHEM.COMPOUND": "123887334"
+                      "INCHIKEY": "115975484"
+                      "CAS": "4112274"
+                      "HMDB": "217920"
+                      "CHEMBL.COMPOUND": "2479770"
+                      "UNII": "138975"
+                      "CHEBI": "218762"
+                      "MESH": "256235"
+                      "UMLS": "603550"
+                      "DrugCentral": "4995"
+                      "GTOPDB": "13265"
+                      "RXCUI": "124800"
+                      "DRUGBANK": "15274"
+                      "KEGG.COMPOUND": "16039"
+                  "biolink:AnatomicalEntity":
                     curie_prefix:
-                      GO: 1234,
-                      PUBCHEM: 4567,
-                      etc.: a hit count
+                      "UMLS": "159941",
+                      "FMA": "98631",
+                      "UBERON": "14564",
+                      "ZFA": "606",
+                      "NCIT": "10286",
+                      "MESH": "1992",
+                      "EMAPA": "966",
+                      "FBbt": "117",
+                      "WBbt": "18",
+                      "GO": "4041",
+                      "SNOMEDCT": "1422",
+                      "CL": "3043"
                 type: object
           description: Results
       summary: Return the number of times each CURIE prefix appears in an equivalent
@@ -189,9 +209,13 @@ paths:
                 example:
                   semantic_types:
                     types:
-                    - cellular_component
-                    - named_thing
-                    - etc.
+                      - biolink:ChemicalMixture
+                      - biolink:MacromolecularMachineMixin
+                      - biolink:GeographicLocation
+                      - biolink:Agent
+                      - biolink:Protein
+                      - biolink:DiseaseOrPhenotypicFeature
+                      - etc.
                 type: object
           description: Results
       summary: Return a list of BioLink semantic types for which normalization has

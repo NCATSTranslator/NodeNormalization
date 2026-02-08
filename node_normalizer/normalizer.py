@@ -39,7 +39,7 @@ def sort_identifiers_with_boosted_prefixes(identifiers, prefixes):
     - Any identifier that has a prefix in prefixes is sorted based on its order in prefixes.
     - Any identifier that does not have a prefix in prefixes is left in place.
 
-    Copied from https://github.com/TranslatorSRI/Babel/blob/0c3f3aed1bb1647f1ca101ba905dc241797fdfc9/src/babel_utils.py#L315-L333
+    Copied from https://github.com/NCATSTranslator/Babel/blob/0c3f3aed1bb1647f1ca101ba905dc241797fdfc9/src/babel_utils.py#L315-L333
 
     :param identifiers: A list of identifiers to sort. This is a list of dictionaries
         containing `identifier` and `label` keys, and possible others that we ignore.
@@ -708,7 +708,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
     # OK, now we should have id's in the format [ {"i": "MONDO:12312", "l": "Scrofula"}, {},...]
     eids = equivalent_ids[canonical_id]
 
-    # As per https://github.com/TranslatorSRI/Babel/issues/158, we select the first label from any
+    # As per https://github.com/NCATSTranslator/Babel/issues/158, we select the first label from any
     # identifier _except_ where one of the types is in preferred_name_boost_prefixes, in which case
     # we prefer the prefixes listed there.
     #
@@ -829,7 +829,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
         node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)
 
     # We need to remove `biolink:Entity` from the types returned.
-    # (See explanation at https://github.com/TranslatorSRI/NodeNormalization/issues/173)
+    # (See explanation at https://github.com/NCATSTranslator/NodeNormalization/issues/173)
     if 'biolink:Entity' in types[canonical_id]:
         types[canonical_id].remove('biolink:Entity')
 

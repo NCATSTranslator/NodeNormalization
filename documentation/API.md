@@ -100,7 +100,7 @@ Example output:
     This means that a conflated clique will be represented by a single list of equivalent identifiers, starting with the
     equivalent identifiers from the first clique, followed by the equivalent identifiers from the second clique, and so
     on. There is currently no way to retrieve the clique leaders (although
-    [this is a requested feature](https://github.com/TranslatorSRI/NodeNormalization/issues/320)), but you can use the
+    [this is a requested feature](https://github.com/NCATSTranslator/NodeNormalization/issues/320)), but you can use the
     `individual_types` parameter to get a Biolink type for each identifier.
 
 ## Sets
@@ -174,7 +174,7 @@ Example output:
 {
   "status": "running",
   "babel_version": "2025mar31",
-  "babel_version_url": "https://github.com/TranslatorSRI/Babel/blob/master/releases/2025mar31.md",
+  "babel_version_url": "https://github.com/NCATSTranslator/Babel/blob/master/releases/2025mar31.md",
   "databases": {
     "eq_id_to_id_db": {
       "dbname": "id-id",
@@ -190,10 +190,10 @@ Example output:
 Output values:
 
 * `status` (example: `running`): Whether or not the service is running.
-* `babel_version` (example: `2025mar31`): The version of [Babel](https://github.com/TranslatorSRI/Babel) used to generate
+* `babel_version` (example: `2025mar31`): The version of [Babel](https://github.com/NCATSTranslator/Babel) used to generate
   the cliques being presented. These are usually date-based versions indicating approximately when the Babel build was
   completed.
-* `babel_version_url` (example: https://github.com/TranslatorSRI/Babel/blob/master/releases/2025mar31.md): A URL you
+* `babel_version_url` (example: https://github.com/NCATSTranslator/Babel/blob/master/releases/2025mar31.md): A URL you
   can use to learn more about this version of Babel, and how it differs from previous and future versions.
 * `databases`: A dictionary of Redis key-value databases used by this NodeNorm instance (currently: 7). Each database
   uses the internal name of this database as its key, along with the following information:

@@ -1,5 +1,5 @@
 # set_id.py
-# Code related to generating IDs for sets (as in https://github.com/TranslatorSRI/NodeNormalization/issues/256).
+# Code related to generating IDs for sets (as in https://github.com/NCATSTranslator/NodeNormalization/issues/256).
 import base64
 import gzip
 import hashlib
@@ -89,7 +89,7 @@ async def generate_setid(app, curies, conflations) -> SetIDResponse:
     # response.sha224hash = hashlib.sha224(normalized_string.encode('utf-8')).hexdigest()
 
     # - base64+zip, so it would be reversible, which might be something we want at some point
-    #   (https://github.com/TranslatorSRI/NodeNormalization/issues/256#issuecomment-2197465751),
+    #   (https://github.com/NCATSTranslator/NodeNormalization/issues/256#issuecomment-2197465751),
     #   but that is also too long.
     # response.base64 = base64.b64encode(normalized_string.encode('utf-8')).decode('utf-8')
     # compressed_normalized_string = zlib.compress(normalized_string.encode('utf-8'))

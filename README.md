@@ -1,6 +1,10 @@
-[![Publish to GitHub Packages](https://github.com/TranslatorSRI/NodeNormalization/actions/workflows/release.yml/badge.svg)](https://github.com/TranslatorSRI/NodeNormalization/actions/workflows/release.yml)
-
 # NodeNormalization
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18489030.svg)](https://doi.org/10.5281/zenodo.18489030) [![arXiv](https://img.shields.io/badge/arXiv-2601.10008-b31b1b.svg)](https://arxiv.org/abs/2601.10008)
+
+<!-- Previous badges that aren't very useful:
+[![Publish to GitHub Packages](https://github.com/TranslatorSRI/NodeNormalization/actions/workflows/release.yml/badge.svg)](https://github.com/TranslatorSRI/NodeNormalization/actions/workflows/release.yml)
+-->
 
 ## Introduction
 

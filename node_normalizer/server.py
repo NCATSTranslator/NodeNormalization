@@ -376,7 +376,7 @@ async def get_semantic_types_handler() -> SemanticTypes:
         raise HTTPException(detail="No semantic types discovered.", status_code=404)
 
     # get the distinct list of Biolink model types in the correct format
-    # https://github.com/TranslatorSRI/NodeNormalization/issues/29
+    # https://github.com/NCATSTranslator/NodeNormalization/issues/29
     ret_val = SemanticTypes(semantic_types={"types": list(set(types))})
 
     # return the data to the caller

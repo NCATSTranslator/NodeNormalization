@@ -10,7 +10,7 @@ info:
   description: 'Node Normalization takes a CURIE, and returns: <ol> <li>The preferred
     CURIE for this entity <li>All other known equivalent identifiers for the entity
     <li>Semantic types for the entity as defined by the <a href="https://biolink.github.io/biolink-model/">Biolink
-    Model</a> </ol> The data served by Node Normalization is created by <a href="https://github.com/TranslatorSRI/Babel">Babel</a>,
+    Model</a> </ol> The data served by Node Normalization is created by <a href="https://github.com/NCATSTranslator/Babel">Babel</a>,
     which attempts to find identifier equivalences, and makes sure that CURIE prefixes
     are BioLink Model Compliant. To determine whether Node Normalization is likely
     to be useful, check /get_semantic_types, which lists the BioLink semantic types
@@ -18,7 +18,7 @@ info:
     the number of times each prefix is used for a semantic type. You can find out more about these API methods at the
     <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md">Node Normalization API documentation</a>.
     To learn more about how Babel creates cliques of equivalent identifiers, you can
-    <a href="https://github.com/TranslatorSRI/Babel/blob/master/docs/README.md">read its documentation</a>.'
+    <a href="https://github.com/NCATSTranslator/Babel/blob/master/docs/README.md">read its documentation</a>.'
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -56,7 +56,7 @@ paths:
                 example:
                   status: running
                   babel_version: 2025mar31
-                  babel_version_url: https://github.com/TranslatorSRI/Babel/blob/master/releases/2025mar31.md
+                  babel_version_url: https://github.com/NCATSTranslator/Babel/blob/master/releases/2025mar31.md
                   databases:
                     eq_id_to_id_db:
                       dbname: id-id

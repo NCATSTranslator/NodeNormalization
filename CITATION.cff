@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Wang"
+  given-names: "Patrick"
+- family-names: "Vaidya"
+  given-names: "Gaurav"
+  orcid: "https://orcid.org/0000-0003-4554-1845"
+title: "NodeNormalization"
+version: 2.4.0
+doi: 10.5281/zenodo.18489030
+date-released: 2026-02-04
+url: "https://github.com/NCATSTranslator/NodeNormalization"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Vaidya"
+    given-names: "Gaurav"
+    orcid: "https://orcid.org/0000-0003-4554-1845"
+  - family-names: "Wang"
+    given-names: "Patrick"
+  title: "Node Normalization: A Service for CURIE Equivalence and Semantic Type Mapping"
+  journal: "arXiv preprint arXiv:2601.10008"
+  year: 2026

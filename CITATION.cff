@@ -1,24 +1,32 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
 authors:
-- family-names: "Wang"
-  given-names: "Patrick"
 - family-names: "Vaidya"
   given-names: "Gaurav"
   orcid: "https://orcid.org/0000-0003-4554-1845"
-title: "NodeNormalization"
-version: 2.4.0
-doi: 10.5281/zenodo.18489030
-date-released: 2026-02-04
+- given-names: Phillips
+  family-names: Owen
+  affiliation: Renaissance Computing Institute, University of North Carolina
+  orcid: https://orcid.org/0000-0002-5146-8434
+- given-names: Jason
+  family-names: Reilly
+  affiliation: Renaissance Computing Institute, University of North Carolina
+  orcid: 'https://orcid.org/0009-0004-5691-2831'
+- family-names: "Wang"
+  given-names: "Patrick"
+  affiliation: Duke University
+  orcid: "https://orcid.org/0000-0002-6693-6106"
+- given-names: Chris
+  family-names: Bizon
+  email: bizon@renci.org
+  orcid: 'https://orcid.org/0000-0002-9491-7674'
+- family-names: "Kebede"
+  given-names: "Yaphet"
+  affiliation: Renaissance Computing Institute, University of North Carolina
+  orcid: "https://orcid.org/0000-0002-5046-0246"
+title: "Node Normalizer"
 url: "https://github.com/NCATSTranslator/NodeNormalization"
-preferred-citation:
-  type: article
-  authors:
-  - family-names: "Vaidya"
-    given-names: "Gaurav"
-    orcid: "https://orcid.org/0000-0003-4554-1845"
-  - family-names: "Wang"
-    given-names: "Patrick"
-  title: "Node Normalization: A Service for CURIE Equivalence and Semantic Type Mapping"
-  journal: "arXiv preprint arXiv:2601.10008"
-  year: 2026
+abstract: Service that produces Translator compliant nodes given a CURIE.
+license: MIT
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.18489030

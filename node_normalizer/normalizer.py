@@ -511,7 +511,7 @@ async def get_eqids_and_types(
     types_with_ancestors = []
     for index, typ in enumerate(types):
         if not typ:
-            logging.error(f"No type information found for '{canonical_nonan[index]}' with eqids: {eqids[index]}, "
+            logger.error(f"No type information found for '{canonical_nonan[index]}' with eqids: {eqids[index]}, "
                           f"replacing with {BIOLINK_NAMED_THING}")
             types_with_ancestors.append([BIOLINK_NAMED_THING])
         else:
@@ -532,6 +532,7 @@ async def get_normalized_nodes(
         include_descriptions: bool = False,
         include_individual_types: bool = True,
         include_taxa: bool = True,
+        include_clique_leaders: bool = False,
 ) -> Dict[str, Optional[str]]:
     """
     Get value(s) for key(s) using redis MGET
@@ -555,6 +556,7 @@ async def get_normalized_nodes(
     canonical_ids = await app.state.eq_id_to_id_db.mget(*upper_curies, encoding='utf-8')
     canonical_nonan = [canonical_id for canonical_id in canonical_ids if canonical_id is not None]
     info_contents = {}
+    clique_leaders = {}
 
     # did we get some canonical ids
     if canonical_nonan:
@@ -569,19 +571,27 @@ async def get_normalized_nodes(
             other_ids = []
 
             if conflate_gene_protein:
-                other_ids.extend(await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8'))
+                gene_protein_clique_leaders_strings = await app.state.gene_protein_db.mget(*canonical_nonan, encoding='utf8')
+                gene_protein_clique_leaders = [json.loads(oids) if oids else [] for oids in gene_protein_clique_leaders_strings]
+                other_ids.extend(gene_protein_clique_leaders)
+                if include_clique_leaders:
+                    clique_leaders.update(zip(canonical_nonan, gene_protein_clique_leaders))
 
             # logger.error(f"After conflate_gene_protein: {other_ids}")
 
             if conflate_chemical_drug:
-                other_ids.extend(await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8'))
+                drug_chemical_clique_leaders_strings = await app.state.chemical_drug_db.mget(*canonical_nonan, encoding='utf8')
+                drug_chemical_clique_leaders = [json.loads(oids) if oids else [] for oids in drug_chemical_clique_leaders_strings]
+                other_ids.extend(drug_chemical_clique_leaders)
+                if include_clique_leaders:
+                    clique_leaders.update(zip(canonical_nonan, drug_chemical_clique_leaders))
 
             # logger.error(f"After conflate_chemical_drug: {other_ids}")
 
             # if there are other ids, then we want to rebuild eqids and types.  That's because even though we have them,
             # they're not necessarily first.  For instance if what came in and got canonicalized was a protein id
             # and we want gene first, then we're relying on the order of the other_ids to put it back in the right place.
-            other_ids = [json.loads(oids) if oids else [] for oids in other_ids]
+            # other_ids = [json.loads(oids) if oids else [] for oids in other_ids]
 
             # Until we added conflate_chemical_drug, canonical_nonan and other_ids would always have the same
             # length, so we could figure out mappings from one to the other just by doing:
@@ -619,7 +629,7 @@ async def get_normalized_nodes(
                     t = []
 
                 for other in dereference_others[canonical_id]:
-                    # logging.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
+                    # logger.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
                     e += deref_others_eqs[other]
                     t += deref_others_typ[other]
 
@@ -637,7 +647,7 @@ async def get_normalized_nodes(
 
     # output the final result
     normal_nodes = {
-        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
+        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents, clique_leaders,
                                        include_descriptions=include_descriptions,
                                        include_individual_types=include_individual_types,
                                        include_taxa=include_taxa,
@@ -651,7 +661,7 @@ async def get_normalized_nodes(
     end_time = time.time_ns()
     logger.info(f"Normalized {len(curies)} nodes in {(end_time - start_time)/1_000_000:.2f} ms with arguments " +
                 f"(curies={curies}, conflate_gene_protein={conflate_gene_protein}, conflate_chemical_drug={conflate_chemical_drug}, " +
-                f"include_descriptions={include_descriptions}, include_individual_types={include_individual_types})")
+                f"include_descriptions={include_descriptions}, include_individual_types={include_individual_types}, include_clique_leaders={include_clique_leaders})")
 
     return normal_nodes
 
@@ -680,7 +690,7 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     return new_attrib
 
 
-async def create_node(app, canonical_id, equivalent_ids, types, info_contents, include_descriptions=True,
+async def create_node(app, canonical_id, equivalent_ids, types, info_contents, clique_leaders, include_descriptions=True,
                       include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
@@ -693,16 +703,16 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
 
     # If we have 'None' in the equivalent IDs, skip it so we don't confuse things further down the line.
     if None in equivalent_ids[canonical_id]:
-        logging.warning(f"Skipping None in canonical ID {canonical_id} among eqids: {equivalent_ids}")
+        logger.warning(f"Skipping None in canonical ID {canonical_id} among eqids: {equivalent_ids}")
         equivalent_ids[canonical_id] = [x for x in equivalent_ids[canonical_id] if x is not None]
         if not equivalent_ids[canonical_id]:
-            logging.warning(f"No non-None values found for ID {canonical_id} among filtered eqids: {equivalent_ids}")
+            logger.warning(f"No non-None values found for ID {canonical_id} among filtered eqids: {equivalent_ids}")
             return None
 
     # If we have 'None' in the canonical types, something went horribly wrong (specifically: we couldn't
     # find the type information for all the eqids for this clique). Return None.
     if None in types[canonical_id]:
-        logging.error(f"No types found for canonical ID {canonical_id} among types: {types}")
+        logger.error(f"No types found for canonical ID {canonical_id} among types: {types}")
         return None
 
     # OK, now we should have id's in the format [ {"i": "MONDO:12312", "l": "Scrofula"}, {},...]
@@ -721,8 +731,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
         identifiers_with_labels = eids
     else:
         # We have a conflation going on! To replicate Babel's behavior, we need to run the algorithem
-        # on the list of labels corresponding to the first
-        # So we need to run the algorithm on the first set of identifiers that have any
+        # on the list of labels corresponding to the first set of identifiers that have any
         # label whatsoever.
         identifiers_with_labels = []
         curies_already_checked = set()
@@ -800,12 +809,14 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
 
     # now need to reformat the identifier keys.  It could be cleaner but we have to worry about if there is a label
     descriptions = []
+    clique_leaders_output = {}
     node_taxa = set()
     node["equivalent_identifiers"] = []
     for eqid in eids:
         eq_item = {"identifier": eqid["i"]}
         if "l" in eqid and eqid["l"]:
             eq_item["label"] = eqid["l"]
+
         # if descriptions is enabled, add it to descriptions.
         if include_descriptions and "d" in eqid and len(eqid["d"]) > 0:
             desc = eqid["d"][0]
@@ -821,12 +832,34 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
+        if clique_leaders and canonical_id in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
+            clique_leaders_output[eqid["i"]] = { "identifier": eqid["i"] }
+            if "label" in eq_item:
+                clique_leaders_output[eqid["i"]]["label"] = eq_item["label"]
+            if "description" in eq_item:
+                clique_leaders_output[eqid["i"]]["description"] = eq_item["description"]
+            if "taxa" in eq_item:
+                clique_leaders_output[eqid["i"]]["taxa"] = eq_item["taxa"]
+            if "type" in eq_item:
+                clique_leaders_output[eqid["i"]]["type"] = eq_item["type"]
+
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions
         node["id"]["description"] = descriptions[0]
 
     if include_taxa and node_taxa:
         node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)
+
+    # Add clique leaders if available.
+    if clique_leaders:
+        node["clique_leaders"] = []
+        for cl_id in clique_leaders:
+            if cl_id in clique_leaders_output:
+                node["clique_leaders"].append(clique_leaders_output[cl_id])
+            else:
+                node["clique_leaders"].append({
+                    "identifier": cl_id,
+                })
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/NCATSTranslator/NodeNormalization/issues/173)

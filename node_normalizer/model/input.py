@@ -41,6 +41,11 @@ class CurieList(BaseModel):
         title="Whether to return taxa for equivalent identifiers"
     )
 
+    include_clique_leaders: bool = Field(
+        default=False,
+        title="Whether to return clique leaders for conflated identifiers"
+    )
+
     class Config:
         schema_extra = {
             "example": {

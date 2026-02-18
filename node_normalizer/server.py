@@ -119,8 +119,14 @@ async def status() -> Dict:
     babel_version = os.environ.get("BABEL_VERSION", "unknown")
     babel_version_url = os.environ.get("BABEL_VERSION_URL", "")
 
+    # Can we figure out the NodeNorm version?
+    nodenorm_version = "unknown"
+    if "version" in app.openapi_schema.info:
+        nodenorm_version = "v" + app.openapi_schema.info.version
+
     return {
         "status": "running",
+        "nodenorm_version": nodenorm_version,
         "babel_version": babel_version,
         "babel_version_url": babel_version_url,
         "biolink_model": {

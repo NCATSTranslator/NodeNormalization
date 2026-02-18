@@ -268,11 +268,11 @@ async def get_normalized_node_handler(
     curie: List[str] = fastapi.Query(
         [],
         description="List of curies to normalize",
-        example=["MESH:D014867", "NCIT:C34373"],
+        example=["MESH:D014867", "NCIT:C34373", "NCBIGene:1756"],
         min_items=1,
     ),
     conflate: bool = fastapi.Query(True, description="Whether to apply gene/protein conflation"),
-    drug_chemical_conflate: bool = fastapi.Query(False, description="Whether to apply drug/chemical conflation"),
+    drug_chemical_conflate: bool = fastapi.Query(True, description="Whether to apply drug/chemical conflation"),
     description: bool = fastapi.Query(False, description="Whether to return curie descriptions when possible"),
     individual_types: bool = fastapi.Query(False, description="Whether to return individual types for equivalent identifiers"),
     include_taxa: bool = fastapi.Query(True, description="Whether to return taxa for equivalent identifiers"),

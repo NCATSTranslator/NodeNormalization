@@ -551,7 +551,7 @@ async def get_normalized_nodes(
     # conflation_types = {"biolink:Gene", "biolink:Protein"}
     # conflation_redis = 5
 
-    upper_curies = [c.upper() for c in curies]
+    upper_curies = [c.strip().upper() for c in curies]
     canonical_ids = await app.state.eq_id_to_id_db.mget(*upper_curies, encoding='utf-8')
     canonical_nonan = [canonical_id for canonical_id in canonical_ids if canonical_id is not None]
     info_contents = {}

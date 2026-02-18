@@ -121,8 +121,8 @@ async def status() -> Dict:
 
     # Can we figure out the NodeNorm version?
     nodenorm_version = "unknown"
-    if "version" in app.openapi_schema.info:
-        nodenorm_version = "v" + app.openapi_schema.info.version
+    if "version" in app.openapi_schema["info"]:
+        nodenorm_version = "v" + app.openapi_schema["info"]["version"]
 
     return {
         "status": "running",

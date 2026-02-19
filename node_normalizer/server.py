@@ -258,18 +258,21 @@ async def get_conflations() -> ConflationList:
 
 @app.get(
     "/get_normalized_nodes",
-    summary="Get the equivalent identifiers and semantic types for the curie(s) entered.",
-    description="Returns the equivalent identifiers and semantic types for the curie(s)",
+    summary="Get the equivalent identifiers and semantic types for the CURIEs entered.",
+    description="Returns the equivalent identifiers and semantic types for the CURIEs entered."
+                "You can optionally <a href=\"https://github.com/NCATSTranslator/Babel/blob/master/docs/Conflation.md\">conflate identifiers</a> if needed."
+                "You can read more about this endpoint in the "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_normalized_nodes\">NodeNorm API documentation</a>.",
 )
 async def get_normalized_node_handler(
     curie: List[str] = fastapi.Query(
         [],
         description="List of curies to normalize",
-        example=["MESH:D014867", "NCIT:C34373"],
+        example=["MESH:D014867", "NCIT:C34373", "NCBIGene:1756"],
         min_items=1,
     ),
     conflate: bool = fastapi.Query(True, description="Whether to apply gene/protein conflation"),
-    drug_chemical_conflate: bool = fastapi.Query(False, description="Whether to apply drug/chemical conflation"),
+    drug_chemical_conflate: bool = fastapi.Query(True, description="Whether to apply drug/chemical conflation"),
     description: bool = fastapi.Query(False, description="Whether to return curie descriptions when possible"),
     individual_types: bool = fastapi.Query(False, description="Whether to return individual types for equivalent identifiers"),
     include_taxa: bool = fastapi.Query(True, description="Whether to return taxa for equivalent identifiers"),
@@ -375,7 +378,7 @@ async def get_semantic_types_handler() -> SemanticTypes:
         raise HTTPException(detail="No semantic types discovered.", status_code=404)
 
     # get the distinct list of Biolink model types in the correct format
-    # https://github.com/TranslatorSRI/NodeNormalization/issues/29
+    # https://github.com/NCATSTranslator/NodeNormalization/issues/29
     ret_val = SemanticTypes(semantic_types={"types": list(set(types))})
 
     # return the data to the caller

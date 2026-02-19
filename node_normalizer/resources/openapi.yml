@@ -1,7 +1,7 @@
 openapi: 3.0.2
 info:
   title: Node Normalization
-  version: 2.3.28
+  version: 2.4.1
   contact:
     email: bizon@renci.org
     name: Chris Bizon
@@ -9,13 +9,16 @@ info:
     x-role: responsible developer
   description: 'Node Normalization takes a CURIE, and returns: <ol> <li>The preferred
     CURIE for this entity <li>All other known equivalent identifiers for the entity
-    <li>Semantic types for the entity as defined by the <a href="https://biolink.github.io/biolink-model/">BioLink
-    Model</a> </ol> The data served by Node Normalization is created by <a href="https://github.com/TranslatorSRI/Babel">Babel</a>,
+    <li>Semantic types for the entity as defined by the <a href="https://biolink.github.io/biolink-model/">Biolink
+    Model</a> </ol> The data served by Node Normalization is created by <a href="https://github.com/NCATSTranslator/Babel">Babel</a>,
     which attempts to find identifier equivalences, and makes sure that CURIE prefixes
-    are BioLink Model Compliant.  To determine whether Node Normalization is likely
+    are BioLink Model Compliant. To determine whether Node Normalization is likely
     to be useful, check /get_semantic_types, which lists the BioLink semantic types
     for which normalization has been attempted, and /get_curie_prefixes, which lists
-    the number of times each prefix is used for a semantic type.'
+    the number of times each prefix is used for a semantic type. You can find out more about these API methods at the
+    <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md">Node Normalization API documentation</a>.
+    To learn more about how Babel creates cliques of equivalent identifiers, you can
+    <a href="https://github.com/NCATSTranslator/Babel/blob/master/docs/README.md">read its documentation</a>.'
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -41,55 +44,98 @@ tags:
   - name: Interfaces
   - name: trapi
 paths:
+  /status:
+    get:
+      description: 'Returns the status of the Node Normalization service. You can read more about this endpoint in the
+        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#status">NodeNorm API documentation</a>.'
+      responses:
+        '200':
+          description: Successful result describing this NodeNorm instance.
+          content:
+            application/json:
+              schema:
+                example:
+                  status: running
+                  babel_version: 2025mar31
+                  babel_version_url: https://github.com/NCATSTranslator/Babel/blob/master/releases/2025mar31.md
+                  databases:
+                    eq_id_to_id_db:
+                      dbname: id-id
+                      count: 677731045
+                      used_memory_rss_human: 68.83G
+                      is_cluster: false
   /get_curie_prefixes:
     get:
-      description: Returns the curies and their hit count for a semantic type(s).
+      description: 'Returns the curies and their hit count for a semantic type(s). You can read more about this endpoint
+        in the <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_curie_prefixes">NodeNorm API documentation</a>.'
       parameters:
-      - in: query
-        name: semantic_type
-        schema:
-          example:
-          - chemical_substance
-          - anatomical_entity
-          items:
-            type: string
-          type: array
+        - in: query
+          name: semantic_type
+          schema:
+            example:
+              - biolink:ChemicalEntity
+              - biolink:AnatomicalEntity
+            items:
+              type: string
+            type: array
       responses:
         '200':
           content:
             application/json:
               schema:
                 example:
-                  anatomical_entity:
+                  "biolink:ChemicalEntity":
                     curie_prefix:
-                      CHEBI: 1234,
-                      UNICHEM: 4567,
-                      etc.: the hit count
-                  chemical_substance:
+                      "PUBCHEM.COMPOUND": "123887334"
+                      "INCHIKEY": "115975484"
+                      "CAS": "4112274"
+                      "HMDB": "217920"
+                      "CHEMBL.COMPOUND": "2479770"
+                      "UNII": "138975"
+                      "CHEBI": "218762"
+                      "MESH": "256235"
+                      "UMLS": "603550"
+                      "DrugCentral": "4995"
+                      "GTOPDB": "13265"
+                      "RXCUI": "124800"
+                      "DRUGBANK": "15274"
+                      "KEGG.COMPOUND": "16039"
+                  "biolink:AnatomicalEntity":
                     curie_prefix:
-                      GO: 1234,
-                      PUBCHEM: 4567,
-                      etc.: a hit count
+                      "UMLS": "159941"
+                      "FMA": "98631"
+                      "UBERON": "14564"
+                      "ZFA": "606"
+                      "NCIT": "10286"
+                      "MESH": "1992"
+                      "EMAPA": "966"
+                      "FBbt": "117"
+                      "WBbt": "18"
+                      "GO": "4041"
+                      "SNOMEDCT": "1422"
+                      "CL": "3043"
                 type: object
           description: Results
       summary: Return the number of times each CURIE prefix appears in an equivalent
         identifier for a semantic type
       tags:
-      - Interfaces
+        - Interfaces
   /get_normalized_nodes:
     get:
-      description: Returns the equivalent identifiers and semantic types for the curie(s)
-        entered.
+      description: 'Returns the equivalent identifiers and semantic types for the CURIEs entered.
+        You can optionally <a href="https://github.com/NCATSTranslator/Babel/blob/master/docs/Conflation.md">conflate identifiers</a> if needed.
+        You can read more about this endpoint in the
+        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_normalized_nodes">NodeNorm API documentation</a>.'
       parameters:
-      - in: query
-        name: curie
-        schema:
-          example:
-          - MESH:D014867
-          - NCIT:C34373
-          items:
-            type: string
-          type: array
+        - in: query
+          name: curie
+          schema:
+            example:
+              - MESH:D014867
+              - NCIT:C34373
+            items:
+              type: string
+            type: array
       responses:
         '200':
           content:
@@ -97,57 +143,65 @@ paths:
               schema:
                 example:
                   MESH:D014867:
-                    equivalent_identifiers:
-                    - identifier: CHEBI:15377
-                      label: Water
-                    - identifier: CHEMBL.COMPOUND:CHEMBL1098659
-                      label: WATER
-                    - identifier: DRUGBANK:DB09145
-                    - identifier: PUBCHEM:22247451
-                    - identifier: PUBCHEM:962
-                    - identifier: MESH:D014867
-                    - identifier: HMDB:HMDB0002111
-                    - identifier: INCHIKEY:XLYOFNOQVPJJNP-UHFFFAOYSA-N
-                    - identifier: UNII:059QF0K00R
-                    - identifier: KEGG.COMPOUND:C00001
                     id:
                       identifier: CHEBI:15377
                       label: Water
+                    equivalent_identifiers:
+                      - identifier: CHEBI:15377
+                        label: Water
+                      - identifier: CHEMBL.COMPOUND:CHEMBL1098659
+                        label: WATER
+                      - identifier: DRUGBANK:DB09145
+                      - identifier: PUBCHEM:22247451
+                      - identifier: PUBCHEM:962
+                      - identifier: MESH:D014867
+                      - identifier: HMDB:HMDB0002111
+                      - identifier: INCHIKEY:XLYOFNOQVPJJNP-UHFFFAOYSA-N
+                      - identifier: UNII:059QF0K00R
+                      - identifier: KEGG.COMPOUND:C00001
                     type:
-                    - chemical_substance
-                    - molecular_entity
-                    - biological_entity
-                    - named_thing
+                      - biolink:SmallMolecule
+                      - biolink:MolecularEntity
+                      - biolink:ChemicalEntity
+                      - biolink:PhysicalEssence
+                      - biolink:ChemicalOrDrugOrTreatment
+                      - biolink:ChemicalEntityOrGeneOrGeneProduct
+                      - biolink:ChemicalEntityOrProteinOrPolypeptide
+                      - biolink:NamedThing
+                      - biolink:PhysicalEssenceOrOccurrent
+                    information_content: 47.5
                   NCIT:C34373:
                     equivalent_identifiers:
-                    - identifier: MONDO:0004976
-                      label: amyotrophic lateral sclerosis
-                    - identifier: DOID:332
-                    - identifier: OPPHANET:803
-                    - identifier: UMLS:C0393554
-                    - identifier: MESH:D000690
-                    - identifier: MEDDRA:10002026
-                    - identifier: NCIT:C34373
-                    - identifier: HP:0007354
-                      label: Amyotrophic lateral sclerosis
+                      - identifier: MONDO:0004976
+                        label: amyotrophic lateral sclerosis
+                      - identifier: DOID:332
+                      - identifier: OPPHANET:803
+                      - identifier: UMLS:C0393554
+                      - identifier: MESH:D000690
+                      - identifier: MEDDRA:10002026
+                      - identifier: NCIT:C34373
+                      - identifier: HP:0007354
+                        label: Amyotrophic lateral sclerosis
                     id:
                       identifier: MONDO:0004976
                       label: amyotrophic lateral sclerosis
                     type:
-                    - disease
-                    - disease_or_phenotypic_feature
-                    - biological_entity
-                    - named_thing
+                      - biolink:Disease
+                      - biolink:DiseaseorPhenotypicFeature
+                      - biolink:BiologicalEntity
+                      - biolink:ThingWithTaxon
+                      - biolink:NamedThing
+                    information_content: 74.9
                 type: object
           description: Results
-      summary: Get the equivalent identifiers and semantic types for the curie(s)
-        entered.
+      summary: Get the equivalent identifiers and semantic types for the CURIEs entered.
       tags:
-      - Interfaces
+        - Interfaces
   /get_semantic_types:
     get:
-      description: Returns a distinct set of the semantic types discovered in the
-        compendium data.
+      description: 'Returns a distinct set of the semantic types discovered in the
+        compendium data. You can read more about this endpoint in the
+        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_semantic_types">NodeNorm API documentation</a>.'
       responses:
         '200':
           content:
@@ -156,18 +210,31 @@ paths:
                 example:
                   semantic_types:
                     types:
-                    - cellular_component
-                    - named_thing
-                    - etc.
+                      - biolink:ChemicalMixture
+                      - biolink:MacromolecularMachineMixin
+                      - biolink:GeographicLocation
+                      - biolink:Agent
+                      - biolink:Protein
+                      - biolink:DiseaseOrPhenotypicFeature
+                      - etc.
                 type: object
           description: Results
       summary: Return a list of BioLink semantic types for which normalization has
         been attempted.
       tags:
-      - Interfaces
+        - Interfaces
   /get_allowed_conflations:
     get:
-      description: Returns a list of allowed conflation options
+      description: 'Returns a list of allowed conflation options. Conflation allows cliques to be combined on-the-fly
+        on the basis of two different criteria:
+        <ol>
+          <li><code>GeneProtein</code> conflation merges protein-coding genes with the proteins they encode. The gene(s) always
+          appear first in the combined clique.
+          <li><code>DrugChemical</code> conflation merges chemicals based on their active ingredient. We attempt to ensure that
+          the active ingredient appears before any formulations in the combined clique.
+        </ol>
+        You can read <a href="https://github.com/NCATSTranslator/Babel/blob/master/docs/Conflation.md">more about conflation</a> or
+        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_allowed_conflations">more about this endpoint</a>.'
       responses:
         '200':
           content:
@@ -181,4 +248,33 @@ paths:
           description: Results
       summary: Return a list of named conflations.
       tags:
-      - Interfaces
+        - Interfaces
+  /get_setid:
+    get:
+      description: 'Returns the set ID for a given set of CURIEs. A set ID is an identifier that can be used to identify
+        this set of CURIEs going forward. It is currently impossible to recreate a set of CURIEs from a set ID, but the
+        same set of CURIEs given to the same version of Node Normalization will always return the same set ID.
+        You can read more about this endpoint in the
+        <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_setid">NodeNorm API documentation</a>.'
+      responses:
+        '200':
+          description: Successful result
+          content:
+            application/json:
+              schema:
+                example:
+                  curies:
+                    - MESH:D014867
+                    - NCIT:C34373
+                    - UNII:63M8RYN44N
+                    - RUBBISH:1234
+                  conflations:
+                    - GeneProtein
+                    - DrugChemical
+                  error: null
+                  normalized_curies:
+                    - CHEBI:15377
+                    - MONDO:0004976
+                    - RUBBISH:1234
+                  normalized_string: "CHEBI:15377||MONDO:0004976||RUBBISH:1234"
+                  setid: "uuid:771d3c09-9a8c-5c46-8b85-97f481a90d40"

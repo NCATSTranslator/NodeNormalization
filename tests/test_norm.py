@@ -60,7 +60,7 @@ def test_all_missing():
     /get_normalized_nodes previously returned {} if none of the provided CURIEs are resolvable.
     This test ensures that that bug has been fixed.
 
-    Reported in https://github.com/TranslatorSRI/NodeNormalization/issues/113
+    Reported in https://github.com/NCATSTranslator/NodeNormalization/issues/113
     """
     client = TestClient(app)
 

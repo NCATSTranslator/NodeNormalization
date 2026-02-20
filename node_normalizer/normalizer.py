@@ -767,7 +767,7 @@ async def create_node(app, canonical_id, equivalent_ids, direct_types, types_wit
             curie = identifier.get('i', '')
             if curie in curies_already_checked:
                 continue
-            results, _ = await get_eqids_and_types(app, [curie])
+            results, _, _ = await get_eqids_and_types(app, [curie])
 
             identifiers_with_labels = results[0]
             labels = map(lambda ident: ident.get('l', ''), identifiers_with_labels)

@@ -654,7 +654,7 @@ async def get_normalized_nodes(
                 for other in dereference_others[canonical_id]:
                     # logger.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
                     e += deref_others_eqs[other]
-                    dt += deref_others_direct_types[other]
+                    dt += [deref_others_direct_types[other]]
                     t += deref_others_typ[other]
 
                 final_eqids.append(e)

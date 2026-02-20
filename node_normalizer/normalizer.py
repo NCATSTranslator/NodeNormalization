@@ -499,9 +499,29 @@ async def get_info_content(
 
 async def get_eqids_and_types(
         app: FastAPI,
-        canonical_nonan: List) -> Tuple[List, List]:
+        canonical_nonan: List) -> Tuple[List, List, List]:
+    """
+    Retrieve equivalent IDs and their corresponding types, along with ancestor types, by querying databases.
+
+    This function processes a given list of canonical identifiers in batches and fetches their equivalent
+    IDs (`eqids`) from a database. For each identifier, it also retrieves its type information and computes
+    the ancestor types using a function. If no type information is found for a given identifier, a default
+    type is assigned, and an error is logged. The resulting data structures consolidate this information
+    to provide detailed insights into IDs and their associated types.
+
+    :param app: An instance of the FastAPI application containing the database connections.
+    :type app: FastAPI
+    :param canonical_nonan: A list of canonical identifiers for which `eqids` and types need to be fetched.
+    :type canonical_nonan: List
+    :return: A tuple containing three lists:
+        1. A list of equivalent IDs (`eqids`) for each input identifier.
+        2. A list of Biolink types for each input identifier.
+        3. A list of lists containing ancestor types for each input identifier.
+    :rtype: Tuple[List, List, List]
+    """
+
     if len(canonical_nonan) == 0:
-        return [], []
+        return [], [], []
     batch_size = int(os.environ.get("EQ_BATCH_SIZE", 2500))
     eqids = []
     for i in range(0, len(canonical_nonan), batch_size):
@@ -521,7 +541,7 @@ async def get_eqids_and_types(
         for eqid in eqids[index]:
             eqid.update({'types': [typ]})
 
-    return eqids, types_with_ancestors
+    return eqids, types, types_with_ancestors
 
 
 async def get_normalized_nodes(
@@ -564,7 +584,7 @@ async def get_normalized_nodes(
         info_contents = await get_info_content(app, canonical_nonan)
 
         # Get the equivalent_ids and types
-        eqids, types = await get_eqids_and_types(app, canonical_nonan)
+        eqids, direct_types, types_with_ancestors = await get_eqids_and_types(app, canonical_nonan)
 
         # are we looking for conflated values
         if conflate_gene_protein or conflate_chemical_drug:
@@ -608,46 +628,54 @@ async def get_normalized_nodes(
                 dereference_others[canon].extend(oids)
 
             all_other_ids = sum(other_ids, [])
-            eqids2, types2 = await get_eqids_and_types(app, all_other_ids)
+            eqids2, direct_types2, types_with_ancestors2 = await get_eqids_and_types(app, all_other_ids)
 
             # logger.error(f"other_ids = {other_ids}")
             # logger.error(f"dereference_others = {dereference_others}")
             # logger.error(f"all_other_ids = {all_other_ids}")
 
             final_eqids = []
+            final_direct_types = []
             final_types = []
 
             deref_others_eqs = dict(zip(all_other_ids, eqids2))
-            deref_others_typ = dict(zip(all_other_ids, types2))
+            deref_others_direct_types = dict(zip(all_other_ids, direct_types2))
+            deref_others_typ = dict(zip(all_other_ids, types_with_ancestors2))
 
-            zipped = zip(canonical_nonan, eqids, types)
+            zipped = zip(canonical_nonan, eqids, direct_types, types_with_ancestors)
 
-            for canonical_id, e, t in zipped:
+            for canonical_id, e, dt, t in zipped:
                 # here's where we replace the eqids, types
                 if len(dereference_others[canonical_id]) > 0:
                     e = []
+                    dt = []
                     t = []
 
                 for other in dereference_others[canonical_id]:
                     # logger.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
                     e += deref_others_eqs[other]
+                    dt += deref_others_direct_types[other]
                     t += deref_others_typ[other]
 
                 final_eqids.append(e)
+                final_direct_types.append(dt)
                 final_types.append(uniquify_list(t))
 
             dereference_ids = dict(zip(canonical_nonan, final_eqids))
+            dereference_direct_types = dict(zip(canonical_nonan, final_direct_types))
             dereference_types = dict(zip(canonical_nonan, final_types))
         else:
             dereference_ids = dict(zip(canonical_nonan, eqids))
-            dereference_types = dict(zip(canonical_nonan, types))
+            dereference_direct_types = dict(zip(canonical_nonan, direct_types))
+            dereference_types = dict(zip(canonical_nonan, types_with_ancestors))
     else:
         dereference_ids = dict()
+        dereference_direct_types = dict()
         dereference_types = dict()
 
     # output the final result
     normal_nodes = {
-        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents, clique_leaders,
+        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_direct_types, dereference_types, info_contents, clique_leaders,
                                        include_descriptions=include_descriptions,
                                        include_individual_types=include_individual_types,
                                        include_taxa=include_taxa,
@@ -690,7 +718,7 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     return new_attrib
 
 
-async def create_node(app, canonical_id, equivalent_ids, types, info_contents, clique_leaders, include_descriptions=True,
+async def create_node(app, canonical_id, equivalent_ids, direct_types, types_with_ancestors, info_contents, clique_leaders, include_descriptions=True,
                       include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
@@ -711,8 +739,8 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
 
     # If we have 'None' in the canonical types, something went horribly wrong (specifically: we couldn't
     # find the type information for all the eqids for this clique). Return None.
-    if None in types[canonical_id]:
-        logger.error(f"No types found for canonical ID {canonical_id} among types: {types}")
+    if None in types_with_ancestors[canonical_id]:
+        logger.error(f"No types found for canonical ID {canonical_id} among types: {types_with_ancestors}")
         return None
 
     # OK, now we should have id's in the format [ {"i": "MONDO:12312", "l": "Scrofula"}, {},...]
@@ -761,7 +789,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
     # need to reverse it in order to apply preferred_name_boost_prefixes for the most
     # specific type.
     possible_labels = []
-    for typ in types[canonical_id][::-1]:
+    for typ in types_with_ancestors[canonical_id][::-1]:
         if typ in config['preferred_name_boost_prefixes']:
             # This is the most specific matching type, so we use this and then break.
             possible_labels = list(map(lambda ident: ident.get('l', ''),
@@ -832,6 +860,9 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
+        if direct_types and eqid["i"] in direct_types:
+            eq_item["biolink_type"] = direct_types[canonical_id]
+
         if clique_leaders and canonical_id in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
             clique_leaders_output[eqid["i"]] = { "identifier": eqid["i"] }
             if "label" in eq_item:
@@ -863,10 +894,10 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, c
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/NCATSTranslator/NodeNormalization/issues/173)
-    if 'biolink:Entity' in types[canonical_id]:
-        types[canonical_id].remove('biolink:Entity')
+    if 'biolink:Entity' in types_with_ancestors[canonical_id]:
+        types_with_ancestors[canonical_id].remove('biolink:Entity')
 
-    node['type'] = types[canonical_id]
+    node['type'] = types_with_ancestors[canonical_id]
 
     # add the info content to the node if we got one
     if info_contents[canonical_id] is not None:

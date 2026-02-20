@@ -662,11 +662,11 @@ async def get_normalized_nodes(
                 final_types.append(uniquify_list(t))
 
             dereference_ids = dict(zip(canonical_nonan, final_eqids))
-            dereference_direct_types = dict(zip(canonical_nonan, final_direct_types))
+            dereference_direct_types = dict(zip(final_eqids, final_direct_types))
             dereference_types = dict(zip(canonical_nonan, final_types))
         else:
             dereference_ids = dict(zip(canonical_nonan, eqids))
-            dereference_direct_types = dict(zip(canonical_nonan, direct_types))
+            dereference_direct_types = dict(zip(eqids, direct_types))
             dereference_types = dict(zip(canonical_nonan, types_with_ancestors))
     else:
         dereference_ids = dict()

@@ -282,6 +282,7 @@ async def get_normalized_node_handler(
     description: bool = fastapi.Query(False, description="Whether to return curie descriptions when possible"),
     individual_types: bool = fastapi.Query(False, description="Whether to return individual types for equivalent identifiers"),
     include_taxa: bool = fastapi.Query(True, description="Whether to return taxa for equivalent identifiers"),
+    include_clique_leaders: bool = fastapi.Query(False, description="Whether to return clique leaders for conflated identifiers"),
 ):
     """
     Get value(s) for key(s) using redis MGET
@@ -291,6 +292,7 @@ async def get_normalized_node_handler(
                                                   include_descriptions=description,
                                                   include_individual_types=individual_types,
                                                   include_taxa=include_taxa,
+                                                  include_clique_leaders=include_clique_leaders,
                                                   )
 
     # If curie contains at least one entry, then the only way normalized_nodes could be blank
@@ -312,7 +314,7 @@ async def get_normalized_node_handler_post(curies: CurieList):
     """
     normalized_nodes = await get_normalized_nodes(app, curies.curies, curies.conflate, curies.drug_chemical_conflate,
                                                   curies.description, include_individual_types=curies.individual_types,
-                                                  include_taxa=curies.include_taxa,
+                                                  include_taxa=curies.include_taxa, include_clique_leaders=curies.include_clique_leaders,
                                                   )
 
     # If curies.curies contains at least one entry, then the only way normalized_nodes could be blank

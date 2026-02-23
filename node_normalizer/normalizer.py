@@ -854,15 +854,16 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
         node["equivalent_identifiers"].append(eq_item)
 
         if clique_leaders and canonical_id in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
-            clique_leaders_output[eqid["i"]] = { "identifier": eqid["i"] }
+            clique_leader_output = { "identifier": eqid["i"] }
             if "label" in eq_item:
-                clique_leaders_output[eqid["i"]]["label"] = eq_item["label"]
+                clique_leader_output["label"] = eq_item["label"]
             if "description" in eq_item:
-                clique_leaders_output[eqid["i"]]["description"] = eq_item["description"]
+                clique_leader_output["description"] = eq_item["description"]
             if "taxa" in eq_item:
-                clique_leaders_output[eqid["i"]]["taxa"] = eq_item["taxa"]
+                clique_leader_output["taxa"] = eq_item["taxa"]
             if "type" in eq_item:
-                clique_leaders_output[eqid["i"]]["type"] = eq_item["type"]
+                clique_leader_output["type"] = eq_item["type"]
+            clique_leaders_output[eqid["i"]] = clique_leader_output
 
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions

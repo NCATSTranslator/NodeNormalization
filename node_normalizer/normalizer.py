@@ -854,7 +854,10 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
         node["equivalent_identifiers"].append(eq_item)
 
         if clique_leaders and canonical_id in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
-            clique_leader_output = { "identifier": eqid["i"] }
+            clique_leader_output = {
+                "identifier": eqid["i"],
+                "contains": clique_leaders[canonical_id][eqid["i"]],
+            }
             if "label" in eq_item:
                 clique_leader_output["label"] = eq_item["label"]
             if "description" in eq_item:
@@ -874,14 +877,17 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
 
     # Add clique leaders if available.
     if clique_leaders:
-        node["clique_leaders"] = []
+        node["clique_leaders"] = {}
         for cl_id in clique_leaders:
+            if cl_id in node["clique_leaders"]:
+                raise RuntimeError(f"Duplicate clique leader {cl_id} in clique leaders {clique_leaders}")
+
             if cl_id in clique_leaders_output:
-                node["clique_leaders"].append(clique_leaders_output[cl_id])
+                node["clique_leaders"][cl_id] = clique_leaders_output[cl_id]
             else:
-                node["clique_leaders"].append({
+                node["clique_leaders"][cl_id] = {
                     "identifier": cl_id,
-                })
+                }
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/NCATSTranslator/NodeNormalization/issues/173)

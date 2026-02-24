@@ -856,7 +856,6 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
         if clique_leaders and canonical_id in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
             clique_leader_output = {
                 "identifier": eqid["i"],
-                "contains": clique_leaders[canonical_id][eqid["i"]],
             }
             if "label" in eq_item:
                 clique_leader_output["label"] = eq_item["label"]

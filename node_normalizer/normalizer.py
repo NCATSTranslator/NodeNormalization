@@ -575,7 +575,8 @@ async def get_normalized_nodes(
     canonical_ids = await app.state.eq_id_to_id_db.mget(*upper_curies, encoding='utf-8')
     canonical_nonan = [canonical_id for canonical_id in canonical_ids if canonical_id is not None]
     info_contents = {}
-    clique_leaders = {}
+    clique_leaders_gene_protein = {}
+    clique_leaders_drug_chemical = {}
 
     # did we get some canonical ids
     if canonical_nonan:
@@ -594,7 +595,7 @@ async def get_normalized_nodes(
                 gene_protein_clique_leaders = [json.loads(oids) if oids else [] for oids in gene_protein_clique_leaders_strings]
                 other_ids.extend(gene_protein_clique_leaders)
                 if include_clique_leaders:
-                    clique_leaders.update(zip(canonical_nonan, gene_protein_clique_leaders))
+                    clique_leaders_gene_protein.update(zip(canonical_nonan, gene_protein_clique_leaders))
 
             # logger.error(f"After conflate_gene_protein: {other_ids}")
 
@@ -603,7 +604,7 @@ async def get_normalized_nodes(
                 drug_chemical_clique_leaders = [json.loads(oids) if oids else [] for oids in drug_chemical_clique_leaders_strings]
                 other_ids.extend(drug_chemical_clique_leaders)
                 if include_clique_leaders:
-                    clique_leaders.update(zip(canonical_nonan, drug_chemical_clique_leaders))
+                    clique_leaders_drug_chemical.update(zip(canonical_nonan, drug_chemical_clique_leaders))
 
             # logger.error(f"After conflate_chemical_drug: {other_ids}")
 
@@ -628,7 +629,7 @@ async def get_normalized_nodes(
 
             all_other_ids = sum(other_ids, [])
             # We don't care about direct types for conflated identifiers here -- if you want it, you can get it
-            # in clique_leaders.
+            # in clique_leaders_gene_protein.
             eqids2, types_with_ancestors2 = await get_eqids_and_types(app, all_other_ids)
 
             # logger.error(f"other_ids = {other_ids}")
@@ -668,14 +669,18 @@ async def get_normalized_nodes(
 
     # output the final result
     normal_nodes = {
-        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents, clique_leaders,
-                                       include_descriptions=include_descriptions,
-                                       include_individual_types=include_individual_types,
-                                       include_taxa=include_taxa,
-                                       conflations={
-                                           'GeneProtein': conflate_gene_protein,
-                                           'DrugChemical': conflate_chemical_drug,
-                                       })
+        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
+           clique_leaders = {
+               'GeneProtein': clique_leaders_gene_protein,
+               'DrugChemical': clique_leaders_drug_chemical,
+           },
+           include_descriptions=include_descriptions,
+           include_individual_types=include_individual_types,
+           include_taxa=include_taxa,
+           conflations={
+               'GeneProtein': conflate_gene_protein,
+               'DrugChemical': conflate_chemical_drug,
+           })
         for input_curie, canonical_id in zip(curies, canonical_ids)
     }
 
@@ -853,24 +858,27 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
-        print(f"Checking if {canonical_id} is in clique_leaders: {builtin_json.dumps(clique_leaders, indent=2)}")
-        if clique_leaders and canonical_id in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
-            clique_leader_output = {
-                "identifier": eqid["i"],
-            }
-            if "label" in eq_item:
-                clique_leader_output["label"] = eq_item["label"]
+        # print(f"Checking if {canonical_id} is in clique_leaders: {builtin_json.dumps(clique_leaders, indent=2)}")
+        if clique_leaders:
+            for conflation_type in clique_leaders:
+                if canonical_id in clique_leaders[conflation_type] and eqid["i"] in clique_leaders[conflation_type][canonical_id]:
+                    clique_leader_output = {
+                        "identifier": eqid["i"],
+                        "conflation": conflation_type,
+                    }
+                    if "label" in eq_item:
+                        clique_leader_output["label"] = eq_item["label"]
 
-            # For description, taxa and type, we could read them from eq_item, but that
-            # is only set if the appropriate flag was turned on. For completeness, let's
-            # try picking them up if they've been passed to us at all.
-            if "d" in eqid and len(eqid["d"]) > 0:
-                clique_leader_output["description"] = eqid["d"]
-            if "t" in eqid and eqid["t"]:
-                clique_leader_output["taxa"] = eqid["t"]
-            if 'types' in eqid:
-                clique_leader_output["type"] = eqid['types'][-1]
-            clique_leaders_output.append(clique_leader_output)
+                    # For description, taxa and type, we could read them from eq_item, but that
+                    # is only set if the appropriate flag was turned on. For completeness, let's
+                    # try picking them up if they've been passed to us at all.
+                    if "d" in eqid and len(eqid["d"]) > 0:
+                        clique_leader_output["description"] = eqid["d"]
+                    if "t" in eqid and eqid["t"]:
+                        clique_leader_output["taxa"] = eqid["t"]
+                    if 'types' in eqid:
+                        clique_leader_output["type"] = eqid['types'][-1]
+                    clique_leaders_output.append(clique_leader_output)
 
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions
@@ -881,11 +889,7 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
 
     # Add clique leaders if available.
     if clique_leaders and canonical_id in clique_leaders:
-        node["clique_leaders"] = {}
-        for clique_leader_output in clique_leaders_output:
-            cl_id = clique_leader_output["identifier"]
-            # We could also leave this as a list.
-            node["clique_leaders"][cl_id] = clique_leader_output
+        node["clique_leaders"] = clique_leaders_output
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/NCATSTranslator/NodeNormalization/issues/173)

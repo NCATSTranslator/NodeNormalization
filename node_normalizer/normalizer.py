@@ -853,18 +853,22 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
-        if clique_leaders and canonical_id in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
+        if clique_leaders and canonical_id in clique_leaders and eqid["i"].upper() in clique_leaders[canonical_id]:
             clique_leader_output = {
                 "identifier": eqid["i"],
             }
             if "label" in eq_item:
                 clique_leader_output["label"] = eq_item["label"]
-            if "description" in eq_item:
-                clique_leader_output["description"] = eq_item["description"]
-            if "taxa" in eq_item:
-                clique_leader_output["taxa"] = eq_item["taxa"]
-            if "type" in eq_item:
-                clique_leader_output["type"] = eq_item["type"]
+
+            # For description, taxa and type, we could read them from eq_item, but that
+            # is only set if the appropriate flag was turned on. For completeness, let's
+            # try picking them up if they've been passed to us at all.
+            if "d" in eqid and len(eqid["d"]) > 0:
+                clique_leader_output["description"] = eqid["d"]
+            if "t" in eqid and eqid["t"]:
+                clique_leader_output["taxa"] = eqid["t"]
+            if 'types' in eqid:
+                clique_leader_output["type"] = eqid['types'][-1]
             clique_leaders_output.append(clique_leader_output)
 
     if include_descriptions and descriptions:

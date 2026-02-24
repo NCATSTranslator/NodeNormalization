@@ -830,7 +830,7 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
 
     # now need to reformat the identifier keys.  It could be cleaner but we have to worry about if there is a label
     descriptions = []
-    clique_leaders_output = {}
+    clique_leaders_output = []
     node_taxa = set()
     node["equivalent_identifiers"] = []
     for eqid in eids:
@@ -865,7 +865,7 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
                 clique_leader_output["taxa"] = eq_item["taxa"]
             if "type" in eq_item:
                 clique_leader_output["type"] = eq_item["type"]
-            clique_leaders_output[eqid["i"]] = clique_leader_output
+            clique_leaders_output.append(clique_leader_output)
 
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions
@@ -875,18 +875,11 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
         node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)
 
     # Add clique leaders if available.
-    if clique_leaders:
+    if clique_leaders and canonical_id in clique_leaders:
         node["clique_leaders"] = {}
-        for cl_id in clique_leaders:
-            if cl_id in node["clique_leaders"]:
-                raise RuntimeError(f"Duplicate clique leader {cl_id} in clique leaders {clique_leaders}")
-
-            if cl_id in clique_leaders_output:
-                node["clique_leaders"][cl_id] = clique_leaders_output[cl_id]
-            else:
-                node["clique_leaders"][cl_id] = {
-                    "identifier": cl_id,
-                }
+        for clique_leader_output in clique_leaders_output:
+            cl_id = clique_leader_output["identifier"]
+            node["clique_leaders"][cl_id] = clique_leaders_output[cl_id]
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/NCATSTranslator/NodeNormalization/issues/173)

@@ -853,7 +853,7 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
-        if clique_leaders and canonical_id in clique_leaders and eqid["i"].upper() in clique_leaders[canonical_id]:
+        if clique_leaders and canonical_id.strip().upper() in clique_leaders and eqid["i"] in clique_leaders[canonical_id]:
             clique_leader_output = {
                 "identifier": eqid["i"],
             }
@@ -883,6 +883,7 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
         node["clique_leaders"] = {}
         for clique_leader_output in clique_leaders_output:
             cl_id = clique_leader_output["identifier"]
+            # We could also leave this as a list.
             node["clique_leaders"][cl_id] = clique_leader_output
 
     # We need to remove `biolink:Entity` from the types returned.

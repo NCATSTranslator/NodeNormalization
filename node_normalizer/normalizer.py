@@ -879,7 +879,7 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
         node["clique_leaders"] = {}
         for clique_leader_output in clique_leaders_output:
             cl_id = clique_leader_output["identifier"]
-            node["clique_leaders"][cl_id] = clique_leaders_output[cl_id]
+            node["clique_leaders"][cl_id] = clique_leader_output
 
     # We need to remove `biolink:Entity` from the types returned.
     # (See explanation at https://github.com/NCATSTranslator/NodeNormalization/issues/173)

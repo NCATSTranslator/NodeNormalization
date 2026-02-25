@@ -888,7 +888,7 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
         node["taxa"] = sorted(node_taxa, key=get_numerical_curie_suffix)
 
     # Add clique leaders if available.
-    if clique_leaders and canonical_id in clique_leaders:
+    if clique_leaders and clique_leaders_output:
         node["clique_leaders"] = clique_leaders_output
 
     # We need to remove `biolink:Entity` from the types returned.

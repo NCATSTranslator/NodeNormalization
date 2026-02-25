@@ -858,7 +858,7 @@ async def create_node(app, canonical_id, equivalent_ids, types_with_ancestors, i
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
 
-        # print(f"Checking if {canonical_id} is in clique_leaders: {builtin_json.dumps(clique_leaders, indent=2)}")
+        print(f"Checking if {canonical_id} is in clique_leaders: {builtin_json.dumps(clique_leaders, indent=2)}")
         if clique_leaders:
             for conflation_type in clique_leaders:
                 if canonical_id in clique_leaders[conflation_type] and eqid["i"] in clique_leaders[conflation_type][canonical_id]:

@@ -632,7 +632,7 @@ async def get_normalized_nodes(
                 final_types.append(uniquify_list(t))
 
                 # What's the smallest IC value for this canonical ID?
-                info_contents[canonical_id] = min(ic_vals) if ic_vals else None
+                # info_contents[canonical_id] = min(ic_vals) if ic_vals else None
 
             dereference_ids = dict(zip(canonical_nonan, final_eqids))
             dereference_types = dict(zip(canonical_nonan, final_types))
@@ -649,7 +649,7 @@ async def get_normalized_nodes(
 
     # output the final result
     normal_nodes = {
-        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
+        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents, info_contents_all,
                                        include_descriptions=include_descriptions,
                                        include_individual_types=include_individual_types,
                                        include_taxa=include_taxa,
@@ -692,7 +692,7 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     return new_attrib
 
 
-async def create_node(app, canonical_id, equivalent_ids, types, info_contents, include_descriptions=True,
+async def create_node(app, canonical_id, equivalent_ids, types, info_contents, info_contents_all, include_descriptions=True,
                       include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
@@ -834,8 +834,8 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
         node["equivalent_identifiers"].append(eq_item)
 
         # TODO: figure out if this slows us down significantly.
-        if eqid['i'] in info_contents:
-            eq_item["information_content"] = info_contents[eqid['i']]
+        if eqid['i'] in info_contents_all:
+            eq_item["information_content"] = info_contents_all[eqid['i']]
 
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions

@@ -625,7 +625,7 @@ async def get_normalized_nodes(
                     # logging.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
                     e += deref_others_eqs[other]
                     t += deref_others_typ[other]
-                    if other in info_contents_all:
+                    if other in info_contents_all and info_contents_all[other]:
                         ic_vals.append(info_contents_all[other])
 
                 final_eqids.append(e)

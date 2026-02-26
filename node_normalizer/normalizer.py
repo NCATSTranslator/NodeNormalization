@@ -632,7 +632,7 @@ async def get_normalized_nodes(
                 final_types.append(uniquify_list(t))
 
                 # What's the smallest IC value for this canonical ID?
-                # info_contents[canonical_id] = min(ic_vals) if ic_vals else None
+                info_contents[canonical_id] = min(ic_vals) if ic_vals else None
 
             dereference_ids = dict(zip(canonical_nonan, final_eqids))
             dereference_types = dict(zip(canonical_nonan, final_types))

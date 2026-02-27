@@ -614,6 +614,10 @@ async def get_normalized_nodes(
             info_contents_all = await get_info_content(app, all_other_ids)
             info_contents = {}
 
+            # Apparently sometimes we can get to the final info_contents calculation without going through
+            # resetting the ic_vals.
+            ic_vals = None
+
             for canonical_id, e, t in zipped:
                 # here's where we replace the eqids, types
                 if len(dereference_others[canonical_id]) > 0:

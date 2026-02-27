@@ -2,7 +2,7 @@ aioredis<2
 click
 bmt
 deepdiff
-fastapi<0.100
+fastapi==0.83.0
 httptools
 jsonschema
 pytest

@@ -4,7 +4,6 @@ asgiref==3.7.2
 async-timeout==4.0.3
 attrs==23.1.0
 bmt==1.4.6
-bmt-lite-v3.1.0==2.2.2
 certifi==2023.7.22
 charset-normalizer==2.1.1
 click==8.3.1

@@ -1,7 +1,6 @@
 name: 'Publish to GitHub Packages'
 
 on:
-    push:
     release:
         types: [published]
 

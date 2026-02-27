@@ -1,0 +1,17 @@
+{
+    "compendium_directory": "tests/data/compendia",
+    "conflation_directory": "tests/data/conflation",
+    "data_files": [
+        "Gene.txt",
+        "Protein.txt"
+    ],
+    "test_mode": 0,
+    "debug_messages": 1,
+    "conflations": [
+        {
+            "types": ["biolink:Gene", "biolink:Protein"],
+            "file": "GeneProtein.txt",
+            "redis_db": "gene_protein_db"
+        }
+    ]
+}

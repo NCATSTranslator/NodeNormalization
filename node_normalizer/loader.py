@@ -4,7 +4,7 @@ import traceback
 from pathlib import Path
 from itertools import islice
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import json
 import hashlib
 from itertools import combinations
@@ -26,8 +26,8 @@ class NodeLoader:
     a redis database.
     """
 
-    def __init__(self):
-        self._config = self.get_config()
+    def __init__(self, config_file: Optional[Path] = None):
+        self._config = self.get_config(config_file)
 
         self._compendium_directory: Path = Path(self._config["compendium_directory"])
         self._conflation_directory: Path = Path(self._config["conflation_directory"])
@@ -58,11 +58,12 @@ class NodeLoader:
         return ancs
 
     @staticmethod
-    def get_config() -> Dict[str, Any]:
+    def get_config(config_file: Optional[Path] = None) -> Dict[str, Any]:
         """get configuration file"""
-        cname = Path(__file__).parents[1] / "config.json"
+        if config_file is None:
+            config_file = Path(__file__).parents[1] / "config.json"
 
-        with open(cname, "r") as json_file:
+        with open(config_file, "r") as json_file:
             data = json.load(json_file)
 
         return data

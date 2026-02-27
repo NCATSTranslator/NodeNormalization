@@ -2,6 +2,7 @@
 import json
 import time
 
+import pytest
 import reasoner_pydantic
 import requests
 import fastapi
@@ -14,6 +15,7 @@ logger = LoggingUtil.init_logging()
 premerged_response = Path(__file__).parent / "resources" / "premerged_response.json"
 
 
+@pytest.mark.skip(reason="Requires external callback-app container. See docker-compose-test.yml.")
 def test_async_query_callback(session):
 
     # host_url = "http://r3:8080/asyncquery"

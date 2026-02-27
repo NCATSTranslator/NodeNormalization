@@ -1,11 +1,15 @@
 import sys
 import os
 import time
+import socket
+import asyncio
+from pathlib import Path
 
 import pytest
 import logging
 from testcontainers.compose import DockerCompose
 from testcontainers.core.docker_client import DockerClient
+from fastapi.testclient import TestClient
 
 from node_normalizer.util import LoggingUtil
 
@@ -49,3 +53,43 @@ def session(request):
     request.addfinalizer(stop)
 
     return compose, nn_url, callback_url
+
+
+@pytest.fixture(scope="session")
+def integration_client():
+    """
+    Session-scoped fixture for integration tests.
+
+    Requires Redis running on localhost:6379. In CI this is provided by the
+    GitHub Actions services.redis block in .github/workflows/test.yml.
+    Locally: docker compose -f docker-compose-redis.yml up -d
+
+    The TestClient context manager triggers startup_event(), which establishes
+    real Redis connections via redis_config.yaml. All integration tests share
+    this single session; tests must be read-only (no writes to Redis).
+
+    Note: startup_event also downloads the Biolink Model YAML from GitHub via
+    bmt. This is slow on the first run; bmt caches it in ~/.cache afterward.
+    """
+    # Verify Redis is reachable before starting the app; fail fast with a clear
+    # message rather than a cryptic connection error from deep inside the app.
+    redis_host, redis_port = "127.0.0.1", 6379
+    try:
+        with socket.create_connection((redis_host, redis_port), timeout=5):
+            pass
+    except OSError as exc:
+        raise RuntimeError(
+            f"Integration tests require Redis on {redis_host}:{redis_port}. "
+            "Start it with: docker compose -f docker-compose-redis.yml up -d"
+        ) from exc
+
+    # Load test data into Redis using the test-specific config.
+    from node_normalizer.loader import NodeLoader
+
+    test_config_path = Path(__file__).parent / "data" / "config.json"
+    loader = NodeLoader(test_config_path)
+    asyncio.run(loader.load(100_000))
+
+    from node_normalizer.server import app
+    with TestClient(app) as client:
+        yield client

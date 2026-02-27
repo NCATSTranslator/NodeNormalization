@@ -2,14 +2,15 @@ aioredis<2
 click
 bmt
 deepdiff
-fastapi
+fastapi<0.100
 httptools
 jsonschema
 pytest
 pytest-cov
 pytest-asyncio
 pyyaml
-reasoner-pydantic
+pydantic<2
+reasoner-pydantic<5
 redis
 redis-py-cluster
 requests

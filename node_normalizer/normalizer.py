@@ -558,9 +558,6 @@ async def get_normalized_nodes(
 
     # did we get some canonical ids
     if canonical_nonan:
-        # get the information content values
-        info_contents = await get_info_content(app, canonical_nonan)
-
         # Get the equivalent_ids and types
         eqids, types = await get_eqids_and_types(app, canonical_nonan)
 
@@ -597,6 +594,7 @@ async def get_normalized_nodes(
             for canon, oids in zip(itertools.cycle(canonical_nonan), other_ids):
                 dereference_others[canon].extend(oids)
 
+            # sum(other_ids, []) is basically other_ids.flatten().
             all_other_ids = sum(other_ids, [])
             eqids2, types2 = await get_eqids_and_types(app, all_other_ids)
 
@@ -612,32 +610,50 @@ async def get_normalized_nodes(
 
             zipped = zip(canonical_nonan, eqids, types)
 
+            # Look up all the information content values.
+            info_contents_all = await get_info_content(app, all_other_ids)
+            info_contents = {}
+
+            # Apparently sometimes we can get to the final info_contents calculation without going through
+            # resetting the ic_vals.
+            ic_vals = None
+
             for canonical_id, e, t in zipped:
                 # here's where we replace the eqids, types
                 if len(dereference_others[canonical_id]) > 0:
                     e = []
                     t = []
+                    ic_vals = []
 
                 for other in dereference_others[canonical_id]:
                     # logging.debug(f"e = {e}, other = {other}, deref_others_eqs = {deref_others_eqs}")
                     e += deref_others_eqs[other]
                     t += deref_others_typ[other]
+                    if other in info_contents_all and info_contents_all[other]:
+                        ic_vals.append(info_contents_all[other])
 
                 final_eqids.append(e)
                 final_types.append(uniquify_list(t))
 
+                # What's the smallest IC value for this canonical ID?
+                info_contents[canonical_id] = min(ic_vals) if ic_vals else None
+
             dereference_ids = dict(zip(canonical_nonan, final_eqids))
             dereference_types = dict(zip(canonical_nonan, final_types))
+
         else:
             dereference_ids = dict(zip(canonical_nonan, eqids))
             dereference_types = dict(zip(canonical_nonan, types))
+
+            # get the information content values
+            info_contents = await get_info_content(app, canonical_nonan)
     else:
         dereference_ids = dict()
         dereference_types = dict()
 
     # output the final result
     normal_nodes = {
-        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
+        input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents, info_contents_all,
                                        include_descriptions=include_descriptions,
                                        include_individual_types=include_individual_types,
                                        include_taxa=include_taxa,
@@ -680,7 +696,7 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     return new_attrib
 
 
-async def create_node(app, canonical_id, equivalent_ids, types, info_contents, include_descriptions=True,
+async def create_node(app, canonical_id, equivalent_ids, types, info_contents, info_contents_all, include_descriptions=True,
                       include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
@@ -820,6 +836,10 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
         if include_individual_types and 'types' in eqid:
             eq_item["type"] = eqid['types'][-1]
         node["equivalent_identifiers"].append(eq_item)
+
+        # TODO: figure out if this slows us down significantly.
+        if eqid['i'] in info_contents_all:
+            eq_item["information_content"] = info_contents_all[eqid['i']]
 
     if include_descriptions and descriptions:
         node["descriptions"] = descriptions

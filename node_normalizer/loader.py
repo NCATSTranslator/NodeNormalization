@@ -12,7 +12,7 @@ import jsonschema
 import os
 from .redis_adapter import RedisConnectionFactory, RedisConnection
 from bmt import Toolkit
-from bmt.util import format as bmt_format
+from bmt.utils import format_element as bmt_format
 
 from .util import LoggingUtil
 

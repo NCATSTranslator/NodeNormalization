@@ -16,23 +16,6 @@ docker compose -f docker-compose-redis.yml up -d
 
 ## Tests that do not currently pass
 
-### All integration tests (`tests/test_integration.py`)
-
-**Status:** `xfail` (expected failure)
-
-**Root cause:** `bmt==1.4.3` (installed in this environment) is a "lite" variant that
-raises `ValueError: bmt-lite does not support the 'schema' argument` when `server.py`
-calls `Toolkit(BIOLINK_MODEL_URL)` during `startup_event`. The integration test fixture
-(`integration_client` in `conftest.py`) starts the app via `TestClient`, which triggers
-`startup_event`, so all 28 integration tests fail at setup before any test body runs.
-
-**Estimated fix:** Determine the correct `bmt` version that supports passing a schema URL
-to `Toolkit()`, update `requirements.txt`, and re-run. If no such version is easily
-available, the alternative is to make the Biolink Model URL optional in `startup_event`
-and fall back to `Toolkit()` (no URL) for local/test use. Probably 30–60 minutes of work.
-
----
-
 ### `tests/test_loader.py::test_nn_load`
 
 **Status:** Passes, but emits a `RuntimeWarning: coroutine 'NodeLoader.load_compendium' was never awaited`.

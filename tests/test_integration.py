@@ -18,16 +18,7 @@ tests/data/conflation/GeneProtein.txt lines 1-3.
 
 import pytest
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.xfail(
-        reason=(
-            "bmt-lite incompatibility: installed bmt==1.4.3 raises ValueError when "
-            "Toolkit() is passed a schema URL (server.py:75). See tests/README.md."
-        ),
-        strict=False,
-    ),
-]
+pytestmark = pytest.mark.integration
 
 # ---------------------------------------------------------------------------
 # Canonical gene CURIE with one identifier in its clique
@@ -259,13 +250,16 @@ class TestGetCuriePrefixes:
         prefixes = data["biolink:Gene"]["curie_prefix"]
         assert "NCBIGene" in prefixes
 
-    def test_unknown_semantic_type_returns_empty_dict(self, integration_client):
+    def test_unknown_semantic_type_returns_not_found(self, integration_client):
         response = integration_client.get(
             "/get_curie_prefixes",
             params={"semantic_type": ["biolink:NonExistentType"]},
         )
         assert response.status_code == 200
-        assert response.json() == {}
+        data = response.json()
+        # Unknown types are returned with a "Not found" sentinel rather than omitted
+        assert "biolink:NonExistentType" in data
+        assert "Not found" in str(data["biolink:NonExistentType"])
 
 
 # ===========================================================================

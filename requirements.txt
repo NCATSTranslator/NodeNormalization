@@ -2,6 +2,7 @@ aioredis<2
 click
 bmt
 deepdiff
+anyio<4
 fastapi==0.83.0
 httptools
 jsonschema

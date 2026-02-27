@@ -12,7 +12,7 @@ import uuid
 import traceback
 from typing import List, Dict, Optional, Any, Set, Tuple, Union
 from uuid import UUID
-from bmt.utils import format_element as bmt_format
+from bmt.util import format as bmt_format
 
 from fastapi import FastAPI
 from reasoner_pydantic import KnowledgeGraph, Message, QueryGraph, Result, CURIE, Attribute

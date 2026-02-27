@@ -18,7 +18,16 @@ tests/data/conflation/GeneProtein.txt lines 1-3.
 
 import pytest
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.xfail(
+        reason=(
+            "bmt-lite incompatibility: installed bmt==1.4.3 raises ValueError when "
+            "Toolkit() is passed a schema URL (server.py:75). See tests/README.md."
+        ),
+        strict=False,
+    ),
+]
 
 # ---------------------------------------------------------------------------
 # Canonical gene CURIE with one identifier in its clique

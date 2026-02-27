@@ -48,14 +48,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # PLACEHOLDER: create tests/data/config.json and load test data into Redis
-      # Example (fill in once tests/data/config.json is finalized):
-      #   python -c "
-      #   import asyncio
-      #   from node_normalizer.loader import NodeLoader
-      #   loader = NodeLoader('tests/data/config.json')
-      #   asyncio.run(loader.load(100_000))
-      #   "
+      - name: Load test data into Redis
+        run: |
+          python -c "
+          import asyncio
+          from node_normalizer.loader import NodeLoader
+          loader = NodeLoader('tests/data/config.json')
+          asyncio.run(loader.load(100_000))
+          "
 
       - name: Run integration tests
         run: pytest -v -m "integration" --tb=short

@@ -2,6 +2,8 @@ import sys
 import os
 import time
 import socket
+import asyncio
+from pathlib import Path
 
 import pytest
 import logging
@@ -81,13 +83,12 @@ def integration_client():
             "Start it with: docker compose -f docker-compose-redis.yml up -d"
         ) from exc
 
-    # PLACEHOLDER: load test data into Redis before starting the app.
-    # Fill this in once tests/data/config.json is finalized, e.g.:
-    #
-    #   import asyncio
-    #   from node_normalizer.loader import NodeLoader
-    #   loader = NodeLoader("tests/data/config.json")
-    #   asyncio.run(loader.load(100_000))
+    # Load test data into Redis using the test-specific config.
+    from node_normalizer.loader import NodeLoader
+
+    test_config_path = Path(__file__).parent / "data" / "config.json"
+    loader = NodeLoader(test_config_path)
+    asyncio.run(loader.load(100_000))
 
     from node_normalizer.server import app
     with TestClient(app) as client:

@@ -1,7 +1,7 @@
 aioredis~=1.3.1
 click
 bmt==1.4.3
-deepdiff==8.6.1
+deepdiff==8.6.2
 fastapi~=0.108.0
 httptools
 jsonschema~=4.6.0

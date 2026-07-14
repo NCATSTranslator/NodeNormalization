@@ -1,8 +1,6 @@
 from pathlib import Path
 
-import pytest
-
-from node_normalizer.loader import NodeLoader
+from node_normalizer.loader import load_compendium, validate_compendium
 
 
 good_json = Path(__file__).parent / "resources" / "datafile.json"
@@ -10,20 +8,12 @@ bad_json = Path(__file__).parent / "resources" / "datafile_with_errors.json"
 
 
 def test_nn_load():
-    node_loader: NodeLoader = NodeLoader()
-
-    node_loader._test_mode = 1
-
-    assert node_loader.load_compendium(good_json, 5)
+    # test_mode=1 buffers pipeline commands but never executes them, so no
+    # running Redis is required.
+    source_prefixes = load_compendium(good_json, 5, test_mode=1)
+    assert source_prefixes
 
 
 def test_nn_record_validation():
-    node_loader: NodeLoader = NodeLoader()
-
-    ret_val = node_loader.validate_compendia(good_json)
-
-    assert ret_val
-
-    ret_val = node_loader.validate_compendia(bad_json)
-
-    assert not ret_val
+    assert validate_compendium(good_json)
+    assert not validate_compendium(bad_json)

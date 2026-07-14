@@ -1,27 +1,12 @@
-from node_normalizer.loader import NodeLoader
-import asyncio
 import sys
 
+from node_normalizer.loader import load_all
 
-async def load_redis():
-    """
-    instantiate the class that does all the work
 
-    :return: Exit code (0 on success, 1 on failure)
-    """
-    loader = NodeLoader()
-
-    # call to load redis instances with normalized node data
-    success: bool = await loader.load(100_000)
-
-    # check the return
+if __name__ == "__main__":
+    success = load_all(100_000)
     if not success:
-        print('Failed to load node normalization data.')
-        return 1
+        print("Failed to load node normalization data.")
     else:
-        print('Success')
-        return 0
-
-
-if __name__ == '__main__':
-    sys.exit(asyncio.run(load_redis()))
+        print("Success")
+    sys.exit(0 if success else 1)

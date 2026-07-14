@@ -75,51 +75,6 @@ async def test_redis_connectors_created(config_dict):
             assert RedisConnectionFactory.get_connection(key) in RedisConnectionMock.instances_list
 
 
-class RedisClusterMock:
-    closed = False
-    redis_instance: RedisInstance = None
-    def __init__(self, *args, **kwargs):
-        pass
-        rc = RedisClusterMock.redis_instance
-        host = rc.hosts[0].host_name
-        port = rc.hosts[0].port
-        start_up_nodes = [ {'host': host.host_name, 'port': host.port } for host in rc.hosts]
-        assert kwargs['startup_nodes'] == start_up_nodes
-        assert kwargs['decode_responses'] == True
-        assert kwargs['skip_full_coverage_check'] == True
-        assert kwargs['password'] == rc.password
-
-        if rc.ssl_enabled:
-            assert kwargs['ssl']
-            assert not kwargs['ssl_cert_reqs']
-        else:
-            assert 'ssl' not in kwargs
-            assert 'ssl_cert_reqs' not in kwargs
-
-        self.k_v = {
-            "someKey": "some"
-        }
-
-    def get(self, name, encoding="utf-8"):
-        return self.k_v.get(name)
-
-    def mget(self, keys):
-        response = {}
-        for k in keys:
-            response[k] = self.k_v.get(k)
-        return response
-
-    def lrange(self, *args, **kwargs):
-        return "lrange called"
-
-    def close(self):
-        RedisClusterMock.closed = True
-
-    @property
-    def connection(self):
-        return not RedisClusterMock.closed
-
-
 class aioredisMock:
 
     def __init__(self, ):
@@ -210,43 +165,10 @@ async def test_redis_aioredis_connection():
 
 
 @pytest.mark.asyncio
-
-async def test_redis_rediscluster():
-    redis_instance: RedisInstance = RedisInstance(ssl_enabled=True,
-                                                  password='somepassword',
-                                                  # it is a cluster
-                                                  is_cluster=True,
+async def test_redis_cluster_rejected():
+    """is_cluster: true is no longer supported and must raise."""
+    redis_instance: RedisInstance = RedisInstance(is_cluster=True,
                                                   db=0,
                                                   hosts=[Resource(host_name="127.0.0.1", port=6379)])
-    RedisClusterMock.redis_instance = redis_instance
-    # redisclustermock = RedisClusterMock("redis://127.0.0.1:6379")
-    with patch('node_normalizer.redis_adapter.RedisCluster', RedisClusterMock):
-        connection = await RedisConnection.create(redis_instance)
-        # test ssl disabled
-        redis_instance.ssl_enabled = False
-        connection = await RedisConnection.create(redis_instance)
-
-        # test get
-        assert "some" == await connection.get("someKey")
-
-        # test mget
-        assert {"someKey": "some", "another": None} == await connection.mget(*['someKey', 'another'])
-
-        # test lrange
-        kwargs = {
-            "key": 2,
-            "start": 1,
-            "stop": 2,
-            "encoding": 'utf-8'
-        }
-        assert "lrange called" == await connection.lrange(**kwargs)
-
-        # test close
-        connection.close()
-        assert RedisClusterMock.closed
-
-        RedisConnectionMock.closed = False
-
-        # assert wait closed
-        await connection.wait_closed()
-        assert RedisClusterMock.closed
+    with pytest.raises(ValueError):
+        await RedisConnection.create(redis_instance)

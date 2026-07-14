@@ -4,7 +4,7 @@ API Input Models not described in reasoner-pydantic
 
 from pydantic import BaseModel, Field
 
-from typing import List, Dict
+from typing import List
 
 
 class CurieList(BaseModel):
@@ -81,11 +81,4 @@ class SetIDQuery(BaseModel):
         [],
         description="Set of conflations to apply",
         example=["GeneProtein", "DrugChemical"],
-    )
-
-
-class SetIDs(BaseModel):
-    """ Query for Set IDs. You can provide a set of named CURIE sets, and we return a response for each one. """
-    sets: Dict[str, SetIDQuery] = Field(
-        description="A list of ",
     )

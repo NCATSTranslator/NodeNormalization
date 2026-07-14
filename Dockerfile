@@ -5,7 +5,6 @@ WORKDIR /code
 
 # install library
 COPY ./requirements.txt requirements.txt
-COPY ./setup.py setup.py
 COPY ./node_normalizer node_normalizer
 COPY ./config.json config.json
 COPY ./redis_config.yaml redis_config.yaml

@@ -4,7 +4,7 @@ from node_normalizer.redis_adapter import ConnectionConfig, RedisInstance, Redis
 from pathlib import Path
 from unittest.mock import patch
 
-REDIS_CONF_PATH = Path(__file__).parent / 'resources' / 'redis-config.yaml'
+REDIS_CONF_PATH = Path(__file__).parent.parent / 'resources' / 'redis-config.yaml'
 
 @pytest.fixture
 def config_dict():

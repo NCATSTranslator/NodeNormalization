@@ -3,7 +3,7 @@ import json
 from node_normalizer.server import app
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch
-from .helpers.redis_mocks import mock_get_equivalent_curies, mock_get_ic
+from ..helpers.redis_mocks import mock_get_equivalent_curies, mock_get_ic
 from pathlib import Path
 import os
 from bmt import Toolkit

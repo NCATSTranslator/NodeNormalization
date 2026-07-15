@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 # Need to add to sources root to avoid linter warnings
-from .helpers.redis_mocks import mock_get_equivalent_curies, mock_get_ic
+from ..helpers.redis_mocks import mock_get_equivalent_curies, mock_get_ic
 from types import SimpleNamespace
 
 from node_normalizer.normalizer import (
@@ -121,8 +121,8 @@ def float_or_none(x):
         return None
 
 
-premerged_graph = Path(__file__).parent / "resources" / "premerged_kgraph.json"
-postmerged_graph = Path(__file__).parent / "resources" / "postmerged_kgraph.json"
+premerged_graph = Path(__file__).parent.parent / "resources" / "premerged_kgraph.json"
+postmerged_graph = Path(__file__).parent.parent / "resources" / "postmerged_kgraph.json"
 
 
 class TestNormalizer:

@@ -18,11 +18,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-loader.txt -r requirements-test.txt
 
-      # test_endpoints.py and test_callback.py use an older docker-compose harness
-      # that builds the full app image; they are not yet wired up for CI (tracked
-      # in issue #383). Everything else runs headless.
       - name: Unit tests
-        run: pytest -m "not integration" --ignore=tests/test_endpoints.py --ignore=tests/test_callback.py
+        run: pytest -m "not integration"
 
       # GitHub's ubuntu runners have Docker, so testcontainers can start a real
       # Redis for the loader integration test.

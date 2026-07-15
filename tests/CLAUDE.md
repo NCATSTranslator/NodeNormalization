@@ -7,7 +7,7 @@ requests/docker/testcontainers landmine) are in `documentation/Loader.md`.
 
 ## The shared-app-singleton pitfall
 
-`test_norm.py` and `test_setid.py` assign to `app.state.*` at **import time**,
+`frontend/test_norm.py` and `frontend/test_setid.py` assign to `app.state.*` at **import time**,
 mutating the shared `node_normalizer.server.app` singleton for the rest of the
 process. Don't assume that app is pristine in a later test, and don't add more
 import-time mutation. New tests should build their own fake app
@@ -38,7 +38,7 @@ mock — it avoids reimplementing the loader's canonical-id/db-5 keying. See
   `create_node` reads Redis beyond these dbs, so the stored-`preferred_name` path needs
   nothing more.
 
-For a pure-unit version that skips Docker entirely, `test_normalizer.py` drives
+For a pure-unit version that skips Docker entirely, `frontend/test_normalizer.py` drives
 `get_normalized_nodes` / `create_node` against a tiny `_MgetRedis` mock — cheaper, but
 you must construct the redis values (canonical-id keys, db-5 JSON, gene-first conflation
 list) by hand, so it's easy to encode an assumption the loader doesn't actually make.

@@ -71,7 +71,7 @@ def redis_connect(db_name: str) -> redis.Redis:
         host=host["host_name"],
         port=int(host["port"]),
         db=config["db"],
-        password=config["password"] or None,
+        password=config.get("password") or None,
         ssl=config.get("ssl_enabled", False),
         decode_responses=True,
     )
@@ -226,7 +226,7 @@ def merge_semantic_meta_data(test_mode: int = 0) -> None:
     """
     types_prefixes_redis = redis_connect("curie_to_bl_type_db")
 
-    meta_data_keys = [key for key in types_prefixes_redis.keys("file-*") if key != "semantic_types"]
+    meta_data_keys = types_prefixes_redis.keys("file-*")
 
     pipeline = types_prefixes_redis.pipeline()
     for meta_data_key in meta_data_keys:

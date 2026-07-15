@@ -123,7 +123,7 @@ change what gets written), time a real load against a local Redis:
   monkeypatching `node_normalizer.config.CONFIG_PATH` to a temp `config.json`
   (remember `biolink_version` is now required); the repo `redis_config.yaml`
   already targets `127.0.0.1:6379`. Run Redis with `docker run -p 6379:6379
-  redis:6.2-alpine` (6.2 matches production).
+  redis:8.2.1-bookworm` (8.2 matches production).
 - **Compare against the baseline** by checking out the old loader into the working
   tree between runs: `git checkout <base-sha> -- node_normalizer/loader`, run, then
   `git checkout <branch> -- node_normalizer/loader` and run again.

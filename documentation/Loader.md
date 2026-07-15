@@ -45,8 +45,11 @@ Consequences worth knowing:
   /code`). That is why the webserver image ships the loader and its dependencies
   (`requirements.txt` **and** `requirements-loader.txt`).
 - `load.py` takes **no arguments**; everything comes from `config.json`. The
-  loader reads exactly five keys: `compendium_directory`, `conflation_directory`,
-  `test_mode`, `data_files`, `conflations`.
+  loader reads exactly six keys: `compendium_directory`, `conflation_directory`,
+  `biolink_version`, `test_mode`, `data_files`, `conflations`. `biolink_version`
+  is a tag/branch/commit in the biolink-model repo, pinned so ancestors are
+  computed against the same model Babel built the data with (the frontend pins
+  its own version separately — see `BIOLINK_MODEL_TAG` in `server.py`).
 - Redis connection details come **only** from `redis_config.yaml`. In Kubernetes
   the chart overwrites it with a generated ConfigMap, so the copy checked into
   this repo governs **local dev and tests only**.

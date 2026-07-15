@@ -10,7 +10,8 @@ NodeNorm is really two programs that share some code:
 
 - **The frontend** — a FastAPI service (`node_normalizer/server.py`) that answers
   normalization queries by reading the backend Redis databases. This is what runs
-  in production behind `/1.3`. See [Frontend](#frontend) below.
+  in production, both at `/` and behind a TRAPI version like `/1.5/`. See
+  [Frontend](#frontend) below.
 - **The loader** — a batch program (`node_normalizer/loader/`, invoked via the
   root `load.py`) that reads Babel compendium/conflation files and populates those
   Redis databases. See [Loader.md](Loader.md).
@@ -52,9 +53,10 @@ test gotchas and the requests/docker/testcontainers landmine, see
 
 ## Frontend
 
-The FastAPI app in `node_normalizer/server.py` serves the normalization API under
-root path `/1.3` (`GET/POST /get_normalized_nodes`, `/query`, `/get_setid`,
-`/get_semantic_types`, `/get_curie_prefixes`, `/status`). It reads the backend
+The FastAPI app in `node_normalizer/server.py` serves the normalization API both
+at `/` and behind a TRAPI version like `/1.5/` (`GET/POST /get_normalized_nodes`,
+`/query`, `/get_setid`, `/get_semantic_types`, `/get_curie_prefixes`, `/status`).
+It reads the backend
 Redis databases via the async `RedisConnection` in `node_normalizer/redis_adapter.py`
 and never touches the loader. Core logic lives in `node_normalizer/normalizer.py`;
 request/response models in `node_normalizer/model/`. Run it with the `uvicorn`
@@ -72,9 +74,18 @@ Larger cleanups that are out of scope for any single PR, filed as issues on the
   is a stored-format change, and `mode: restore` loads RDB backups built by the
   *old* loader — a new server doing `SMEMBERS` on a restored LIST would get
   `WRONGTYPE`. Needs a coordinated loader/server/backup rollout.
-- **`merge_semantic_meta_data` runs once per Job** ([#380](https://github.com/NCATSTranslator/NodeNormalization/issues/380)).
+- **`merge_semantic_meta_data` runs once per Job, and races** ([#380](https://github.com/NCATSTranslator/NodeNormalization/issues/380)).
   It should run once, after all compendium Jobs finish, rather than re-reading
-  every `file-*` key and re-summing on every Job.
+  every `file-*` key and re-summing on every Job. Beyond the redundancy, running
+  it concurrently is a **read-modify-write race**: each Job does `KEYS file-*` →
+  `GET` → sum → `SET <bl_type>`, with no lock, `WATCH`/`MULTI`, or Lua script. Two
+  Jobs that read different subsets of `file-*` keys and then `SET` the same
+  per-type key are last-writer-wins, so the surviving count can reflect only a
+  subset of files. The `file-*` keys themselves don't collide (one distinct key
+  per file) and the aggregates feed only the statistics endpoints
+  (`/get_curie_prefixes`, `/get_semantic_types`), not normalization, so it's
+  tolerated for now — but the fix is architectural (a single post-load merge
+  step), not a lock around this function.
 - **Migrate the frontend off `aioredis`** ([#381](https://github.com/NCATSTranslator/NodeNormalization/issues/381)),
   unmaintained and pinned at 1.3.1. `redis-py` >= 4.2 has asyncio built in, which
   would let the frontend and loader share one client library.

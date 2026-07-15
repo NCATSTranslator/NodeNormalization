@@ -28,10 +28,20 @@ _toolkit = None
 
 
 def _get_toolkit() -> Toolkit:
-    """Build the Biolink toolkit lazily so importing the loader stays cheap."""
+    """
+    Build the Biolink toolkit lazily so importing the loader stays cheap.
+
+    The Biolink Model version is pinned by the `biolink_version` key in
+    config.json (a tag, branch, or commit in the biolink-model repo) so that a
+    load computes ancestors against the same model Babel built the data with,
+    rather than whatever version bmt happens to default to.
+    """
     global _toolkit
     if _toolkit is None:
-        _toolkit = Toolkit()
+        biolink_version = get_config()["biolink_version"]
+        url = f"https://raw.githubusercontent.com/biolink/biolink-model/{biolink_version}/biolink-model.yaml"
+        logger.info(f"Initializing Biolink Model Toolkit from {url}")
+        _toolkit = Toolkit(url)
     return _toolkit
 
 
@@ -75,7 +85,7 @@ def redis_connect(db_name: str) -> redis.Redis:
     documentation/Redis.md).
     """
     with open(REDIS_CONFIG_PATH) as config_file:
-        config = yaml.load(config_file, yaml.FullLoader)[db_name]
+        config = yaml.safe_load(config_file)[db_name]
 
     if config.get("is_cluster"):
         raise ValueError(
@@ -88,7 +98,7 @@ def redis_connect(db_name: str) -> redis.Redis:
         host=host["host_name"],
         port=int(host["port"]),
         db=config["db"],
-        password=config["password"] or None,
+        password=config.get("password") or None,
         ssl=config.get("ssl_enabled", False),
         decode_responses=True,
     )
@@ -112,7 +122,7 @@ def disable_periodic_save() -> None:
     is server-wide, so this hits each backend instance once.
     """
     with open(REDIS_CONFIG_PATH) as config_file:
-        db_names = list(yaml.load(config_file, yaml.FullLoader).keys())
+        db_names = list(yaml.safe_load(config_file).keys())
 
     for db_name in db_names:
         try:
@@ -138,12 +148,11 @@ def validate_compendium(in_file) -> bool:
 
 
 def get_compendia(compendium_directory: Path, data_files: list) -> list:
-    """Return the list of compendium file paths to load, warning on any missing."""
+    """Return the list of compendium file paths to load, raising if any are missing."""
     file_list = [compendium_directory / file_name for file_name in data_files]
-    for file in file_list:
-        if not file.exists():
-            # This should probably raise an exception
-            logger.warning(f"file not found: {file.name}")
+    missing = [str(file) for file in file_list if not file.exists()]
+    if missing:
+        raise FileNotFoundError(f"Compendium file(s) not found: {', '.join(missing)}")
     return file_list
 
 
@@ -265,7 +274,7 @@ def merge_semantic_meta_data(test_mode: int = 0) -> None:
     """
     types_prefixes_redis = redis_connect("curie_to_bl_type_db")
 
-    meta_data_keys = [key for key in types_prefixes_redis.keys("file-*") if key != "semantic_types"]
+    meta_data_keys = types_prefixes_redis.keys("file-*")
 
     pipeline = types_prefixes_redis.pipeline(transaction=False)
     for meta_data_key in meta_data_keys:
@@ -311,10 +320,8 @@ def load_all(block_size: int = 100_000) -> bool:
     else:
         disable_periodic_save()
 
+    # Raises FileNotFoundError if any named compendium is missing.
     compendia = get_compendia(compendium_directory, data_files)
-    if len(compendia) != len(data_files):
-        logger.error("Error: 1 or more data files were incorrect")
-        return False
 
     types_prefixes_redis = redis_connect("curie_to_bl_type_db")
     for comp in compendia:

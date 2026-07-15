@@ -1,8 +1,10 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import node_normalizer.loader.loader as loader_mod
-from node_normalizer.loader import load_compendium, validate_compendium
+from node_normalizer.loader import get_compendia, load_compendium, validate_compendium
 from node_normalizer.loader.loader import _accumulate_source_prefixes
 
 
@@ -20,6 +22,13 @@ def test_nn_load():
 def test_nn_record_validation():
     assert validate_compendium(good_json)
     assert not validate_compendium(bad_json)
+
+
+def test_get_compendia_raises_on_missing_file(tmp_path):
+    # Missing files must fail fast rather than being returned and later crashing
+    # load_all with a FileNotFoundError deep in validate_compendium.
+    with pytest.raises(FileNotFoundError):
+        get_compendia(tmp_path, ["does_not_exist.txt"])
 
 
 class _FakePipeline:

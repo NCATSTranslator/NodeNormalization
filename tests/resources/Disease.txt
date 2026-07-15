@@ -1,0 +1,1 @@
+{"type": "biolink:Disease", "ic": 100.0, "identifiers": [{"i": "UMLS:C4288892", "l": "Infant Acute Undifferentiated Leukemia", "d": [], "t": []}, {"i": "NCIT:C126110", "l": "Infant Acute Undifferentiated Leukemia", "d": ["An acute undifferentiated leukemia that occurs in infancy."], "t": []}], "preferred_name": "Infant Acute Undifferentiated Leukemia", "taxa": []}

@@ -162,7 +162,9 @@ def load_compendium(compendium_filename, block_size: int, test_mode: int = 0) ->
       eq_id_to_id_db:   UPPER(equivalent id) -> canonical id
       id_to_eqids_db:   canonical id -> equivalent identifiers (JSON)
       id_to_type_db:    canonical id -> biolink type
-      info_content_db:  canonical id -> information content
+      info_content_db:  canonical id -> clique properties JSON {"preferred_name", "ic"}
+    (info_content_db is being grown into a general clique-property store; see #306.
+    It formerly held a bare information-content float, so readers must tolerate both.)
     Returns the per-type source-prefix counts accumulated from this file.
     """
     source_prefixes: dict = {}
@@ -203,8 +205,12 @@ def load_compendium(compendium_filename, block_size: int, test_mode: int = 0) ->
                 term2id_pipeline.set(equivalent_id["i"].upper(), identifier)
             id2eqids_pipeline.set(identifier, json.dumps(instance["identifiers"]))
             id2type_pipeline.set(identifier, instance["type"])
-            if "ic" in instance and instance["ic"] is not None:
-                info_content_pipeline.set(identifier, instance["ic"])
+            # Clique-level properties, keyed by canonical id. Every clique gets one
+            # (unlike the old IC-only write, which skipped cliques without an "ic").
+            props = {"preferred_name": instance.get("preferred_name", "")}
+            if instance.get("ic") is not None:
+                props["ic"] = instance["ic"]
+            info_content_pipeline.set(identifier, json.dumps(props))
 
             if test_mode != 1 and line_counter % block_size == 0:
                 term2id_pipeline.execute()

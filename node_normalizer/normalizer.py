@@ -31,6 +31,22 @@ logger = LoggingUtil.init_logging()
 config = get_config()
 
 
+def _clique_props(raw) -> dict:
+    """
+    Parse a value from info_content_db (db 5), which is growing into a general
+    clique-property store (see #306). New loads store a JSON dict
+    {"preferred_name", "ic"}; older loads stored a bare information-content float.
+    Normalize both into a dict so callers can just do .get("ic")/.get("preferred_name").
+    """
+    if raw is None:
+        return {}
+    try:
+        value = json.loads(raw)
+    except (ValueError, TypeError):
+        return {"ic": raw}
+    return value if isinstance(value, dict) else {"ic": value}
+
+
 def sort_identifiers_with_boosted_prefixes(identifiers, prefixes):
     """
     Given a list of identifiers (with `identifier` and `label` keys), sort them using
@@ -486,8 +502,12 @@ async def get_info_content(
     # call redis and get the value
     info_contents = await app.state.info_content_db.mget(*canonical_nonan, encoding='utf8')
 
-    # get this into a list
-    info_contents = [round(float(ic_ids), 1) if ic_ids is not None else None for ic_ids in info_contents]
+    # get this into a list (info_content_db now stores a clique-props JSON; _clique_props
+    # also handles the old bare-float format)
+    info_contents = [
+        round(float(ic), 1) if (ic := _clique_props(raw).get("ic")) is not None else None
+        for raw in info_contents
+    ]
 
     # zip into an array of dicts
     info_contents = dict(zip(canonical_nonan, info_contents))
@@ -634,9 +654,26 @@ async def get_normalized_nodes(
         dereference_ids = dict()
         dereference_types = dict()
 
+    # Look up each clique's Babel-computed preferred_name. The key is the primary
+    # subclique's canonical id (dereference_ids[c][0]['i']), which under conflation
+    # differs from the input clique's canonical id — so this is a second, separate
+    # db-5 read, keyed by node identifier rather than by input canonical.
+    # ponytail: merging this into the get_info_content read would entangle IC (keyed
+    # by input canonical) with preferred_name (primary subclique) semantics.
+    node_ids = {c: dereference_ids[c][0]['i'] for c in canonical_nonan
+                if dereference_ids.get(c) and dereference_ids[c][0]}
+    if node_ids:
+        raw_props = await app.state.info_content_db.mget(*node_ids.values(), encoding='utf8')
+        by_nodeid = dict(zip(node_ids.values(),
+                             (_clique_props(r).get("preferred_name") for r in raw_props)))
+        preferred_names = {c: by_nodeid.get(nid) for c, nid in node_ids.items()}
+    else:
+        preferred_names = {}
+
     # output the final result
     normal_nodes = {
         input_curie: await create_node(app, canonical_id, dereference_ids, dereference_types, info_contents,
+                                       preferred_names=preferred_names,
                                        include_descriptions=include_descriptions,
                                        include_individual_types=include_individual_types,
                                        include_taxa=include_taxa,
@@ -663,8 +700,9 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     :param canonical_nonan:
     :return:
     """
-    # get the information content value
-    ic_val = await app.state.info_content_db.get(canonical_nonan, encoding='utf8')
+    # get the information content value (info_content_db now stores a clique-props JSON;
+    # _clique_props also handles the old bare-float format)
+    ic_val = _clique_props(await app.state.info_content_db.get(canonical_nonan, encoding='utf8')).get("ic")
 
     # did we get a good value
     if ic_val is not None:
@@ -679,8 +717,8 @@ async def get_info_content_attribute(app, canonical_nonan) -> dict:
     return new_attrib
 
 
-async def create_node(app, canonical_id, equivalent_ids, types, info_contents, include_descriptions=True,
-                      include_individual_types=False, include_taxa=False, conflations=None):
+async def create_node(app, canonical_id, equivalent_ids, types, info_contents, preferred_names=None,
+                      include_descriptions=True, include_individual_types=False, include_taxa=False, conflations=None):
     """Construct the output format given the compressed redis data"""
     # It's possible that we didn't find a canonical_id
     if canonical_id is None:
@@ -707,92 +745,107 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, i
     # OK, now we should have id's in the format [ {"i": "MONDO:12312", "l": "Scrofula"}, {},...]
     eids = equivalent_ids[canonical_id]
 
-    # As per https://github.com/NCATSTranslator/Babel/issues/158, we select the first label from any
-    # identifier _except_ where one of the types is in preferred_name_boost_prefixes, in which case
-    # we prefer the prefixes listed there.
-    #
-    # This should perfectly replicate NameRes labels for non-conflated cliques, but it WON'T perfectly
-    # match conflated cliques. To do that, we need to run the preferred label algorithm on ONLY the labels
-    # for the FIRST clique of the conflated cliques with labels.
-    any_conflation = any(conflations.values())
-    if not any_conflation:
-        # No conflation. We just use the identifiers we've been given.
-        identifiers_with_labels = eids
+    # Babel now computes a preferred_name for every clique and we store it in
+    # info_content_db (keyed by the primary subclique's canonical id, i.e. eids[0]['i']).
+    # When present, use it directly (issue #299).
+    preferred_name = (preferred_names or {}).get(canonical_id)
+    if preferred_name:
+        node = {"id": {"identifier": eids[0]['i'], "label": preferred_name}}
     else:
-        # We have a conflation going on! To replicate Babel's behavior, we need to run the algorithem
-        # on the list of labels corresponding to the first
-        # So we need to run the algorithm on the first set of identifiers that have any
-        # label whatsoever.
-        identifiers_with_labels = []
-        curies_already_checked = set()
-        for identifier in eids:
-            curie = identifier.get('i', '')
-            if curie in curies_already_checked:
-                continue
-            results, _ = await get_eqids_and_types(app, [curie])
+        # ---- DEPRECATED FALLBACK — DO NOT MODIFY OR IMPROVE ----
+        # Legacy label-selection, retained only for querying older DB loads that lack a
+        # stored preferred_name. Babel now computes preferred_name centrally
+        # (https://github.com/NCATSTranslator/Babel/blob/16e370be4ba1b9f69b1ce091ccbb111941f35016/src/babel_utils.py#L581);
+        # delete this whole block (and sort_identifiers_with_boosted_prefixes plus the
+        # preferred_name_boost_prefixes/demote_labels_longer_than config) once all
+        # deployments load preferred_name.
+        #
+        # As per https://github.com/NCATSTranslator/Babel/issues/158, we select the first label from any
+        # identifier _except_ where one of the types is in preferred_name_boost_prefixes, in which case
+        # we prefer the prefixes listed there.
+        #
+        # This should perfectly replicate NameRes labels for non-conflated cliques, but it WON'T perfectly
+        # match conflated cliques. To do that, we need to run the preferred label algorithm on ONLY the labels
+        # for the FIRST clique of the conflated cliques with labels.
+        any_conflation = any(conflations.values())
+        if not any_conflation:
+            # No conflation. We just use the identifiers we've been given.
+            identifiers_with_labels = eids
+        else:
+            # We have a conflation going on! To replicate Babel's behavior, we need to run the algorithm
+            # on the list of labels corresponding to the first
+            # So we need to run the algorithm on the first set of identifiers that have any
+            # label whatsoever.
+            identifiers_with_labels = []
+            curies_already_checked = set()
+            for identifier in eids:
+                curie = identifier.get('i', '')
+                if curie in curies_already_checked:
+                    continue
+                results, _ = await get_eqids_and_types(app, [curie])
 
-            identifiers_with_labels = results[0]
-            labels = map(lambda ident: ident.get('l', ''), identifiers_with_labels)
-            if any(map(lambda l: l != '', labels)):
+                identifiers_with_labels = results[0]
+                labels = map(lambda ident: ident.get('l', ''), identifiers_with_labels)
+                if any(map(lambda l: l != '', labels)):
+                    break
+
+                # Since we didn't get any matches here, add it to the list of CURIEs already checked so
+                # we don't make redundant queries to the database.
+                curies_already_checked.update(set(map(lambda x: x.get('i', ''), identifiers_with_labels)))
+
+            # We might get here without any labels, which is fine. At least we tried.
+
+        # At this point:
+        #   - eids will be the full list of all identifiers and labels in this clique.
+        #   - identifiers_with_labels is the list of identifiers and labels for the first subclique that has at least
+        #     one label.
+
+        # Note that types[canonical_id] goes from most specific to least specific, so we
+        # need to reverse it in order to apply preferred_name_boost_prefixes for the most
+        # specific type.
+        possible_labels = []
+        for typ in types[canonical_id][::-1]:
+            if typ in config['preferred_name_boost_prefixes']:
+                # This is the most specific matching type, so we use this and then break.
+                possible_labels = list(map(lambda ident: ident.get('l', ''),
+                                      sort_identifiers_with_boosted_prefixes(
+                                          identifiers_with_labels,
+                                          config['preferred_name_boost_prefixes'][typ]
+                                      )))
+
+                # Add in all the other labels -- we'd still like to consider them, but at a lower priority.
+                for eid in identifiers_with_labels:
+                    label = eid.get('l', '')
+                    if label not in possible_labels:
+                        possible_labels.append(label)
+
+                # Since this is the most specific matching type, we shouldn't do other (presumably higher-level)
+                # categories: so let's break here.
                 break
 
-            # Since we didn't get any matches here, add it to the list of CURIEs already checked so
-            # we don't make redundant queries to the database.
-            curies_already_checked.update(set(map(lambda x: x.get('i', ''), identifiers_with_labels)))
+        # Step 1.2. If we didn't have a preferred_name_boost_prefixes, just use the identifiers in their
+        # Biolink prefix order.
+        if not possible_labels:
+            possible_labels = map(lambda eid: eid.get('l', ''), identifiers_with_labels)
 
-        # We might get here without any labels, which is fine. At least we tried.
+        # Step 2. Filter out any suspicious labels.
+        filtered_possible_labels = [l for l in possible_labels if
+            l and                               # Ignore blank or empty names.
+            not l.startswith('CHEMBL')          # Some CHEMBL names are just the identifier again.
+            ]
 
-    # At this point:
-    #   - eids will be the full list of all identifiers and labels in this clique.
-    #   - identifiers_with_labels is the list of identifiers and labels for the first subclique that has at least
-    #     one label.
+        # Step 3. Filter out labels longer than config['demote_labels_longer_than'], but only if there is at
+        # least one label shorter than this limit.
+        labels_shorter_than_limit = [l for l in filtered_possible_labels if l and len(l) <= config['demote_labels_longer_than']]
+        if labels_shorter_than_limit:
+            filtered_possible_labels = labels_shorter_than_limit
 
-    # Note that types[canonical_id] goes from most specific to least specific, so we
-    # need to reverse it in order to apply preferred_name_boost_prefixes for the most
-    # specific type.
-    possible_labels = []
-    for typ in types[canonical_id][::-1]:
-        if typ in config['preferred_name_boost_prefixes']:
-            # This is the most specific matching type, so we use this and then break.
-            possible_labels = list(map(lambda ident: ident.get('l', ''),
-                                  sort_identifiers_with_boosted_prefixes(
-                                      identifiers_with_labels,
-                                      config['preferred_name_boost_prefixes'][typ]
-                                  )))
-
-            # Add in all the other labels -- we'd still like to consider them, but at a lower priority.
-            for eid in identifiers_with_labels:
-                label = eid.get('l', '')
-                if label not in possible_labels:
-                    possible_labels.append(label)
-
-            # Since this is the most specific matching type, we shouldn't do other (presumably higher-level)
-            # categories: so let's break here.
-            break
-
-    # Step 1.2. If we didn't have a preferred_name_boost_prefixes, just use the identifiers in their
-    # Biolink prefix order.
-    if not possible_labels:
-        possible_labels = map(lambda eid: eid.get('l', ''), identifiers_with_labels)
-
-    # Step 2. Filter out any suspicious labels.
-    filtered_possible_labels = [l for l in possible_labels if
-        l and                               # Ignore blank or empty names.
-        not l.startswith('CHEMBL')          # Some CHEMBL names are just the identifier again.
-        ]
-
-    # Step 3. Filter out labels longer than config['demote_labels_longer_than'], but only if there is at
-    # least one label shorter than this limit.
-    labels_shorter_than_limit = [l for l in filtered_possible_labels if l and len(l) <= config['demote_labels_longer_than']]
-    if labels_shorter_than_limit:
-        filtered_possible_labels = labels_shorter_than_limit
-
-    # Note that the id will be from the equivalent ids, not the canonical_id.  This is to handle conflation
-    if len(filtered_possible_labels) > 0:
-        node = {"id": {"identifier": eids[0]['i'], "label": filtered_possible_labels[0]}}
-    else:
-        # Sometimes, nothing has a label :(
-        node = {"id": {"identifier": eids[0]['i']}}
+        # Note that the id will be from the equivalent ids, not the canonical_id.  This is to handle conflation
+        if len(filtered_possible_labels) > 0:
+            node = {"id": {"identifier": eids[0]['i'], "label": filtered_possible_labels[0]}}
+        else:
+            # Sometimes, nothing has a label :(
+            node = {"id": {"identifier": eids[0]['i']}}
 
     # Now that we've determined a label for this clique, we should never use identifiers_with_labels, possible_labels,
     # or filtered_possible_labels after this point.

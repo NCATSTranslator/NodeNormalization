@@ -170,6 +170,11 @@ about driving the loader from a test:
   `get_config()` reads `config.CONFIG_PATH` at call time, so patch it on
   `node_normalizer.config`.
 
+To *query* the frontend against data a loader test just wrote (end-to-end, rather
+than asserting on raw Redis keys), see `tests/CLAUDE.md` — it covers reusing the
+fixture's `redis_config.yaml` for `RedisConnectionFactory`, the process-wide
+connection cache, and faking the app.
+
 ### Dependency landmine: requests / docker / testcontainers
 
 `requests >= 2.32` changed its `HTTPAdapter`, which breaks the `docker` SDK < 7.1

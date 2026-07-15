@@ -1,0 +1,1 @@
+["NCBIGene:1017", "UniProtKB:B4DDL9", "UniProtKB:E7ESI2", "UniProtKB:G3V5T9", "UniProtKB:P24941"]

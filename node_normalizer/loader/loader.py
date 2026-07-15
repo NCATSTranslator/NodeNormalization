@@ -28,10 +28,20 @@ _toolkit = None
 
 
 def _get_toolkit() -> Toolkit:
-    """Build the Biolink toolkit lazily so importing the loader stays cheap."""
+    """
+    Build the Biolink toolkit lazily so importing the loader stays cheap.
+
+    The Biolink Model version is pinned by the `biolink_version` key in
+    config.json (a tag, branch, or commit in the biolink-model repo) so that a
+    load computes ancestors against the same model Babel built the data with,
+    rather than whatever version bmt happens to default to.
+    """
     global _toolkit
     if _toolkit is None:
-        _toolkit = Toolkit()
+        biolink_version = get_config()["biolink_version"]
+        url = f"https://raw.githubusercontent.com/biolink/biolink-model/{biolink_version}/biolink-model.yaml"
+        logger.info(f"Initializing Biolink Model Toolkit from {url}")
+        _toolkit = Toolkit(url)
     return _toolkit
 
 

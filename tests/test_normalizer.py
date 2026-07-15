@@ -17,6 +17,8 @@ from node_normalizer.normalizer import (
     normalize_kgraph,
     _hash_attributes,
     _merge_node_attributes,
+    _clique_props,
+    create_node,
 )
 
 
@@ -214,6 +216,50 @@ class TestNormalizer:
     #         attribute_source="test_source",
     #     )
     #     assert _hash_attributes([hashable_attribute]) is False
+
+    def test_clique_props(self):
+        # New JSON format round-trips.
+        assert _clique_props('{"preferred_name": "Foo", "ic": 100.0}') == {"preferred_name": "Foo", "ic": 100.0}
+        # Legacy bare float/int/string all normalize to {"ic": ...}.
+        assert _clique_props("100.0") == {"ic": 100.0}
+        assert _clique_props("100") == {"ic": 100}
+        # Missing/absent value -> empty dict.
+        assert _clique_props(None) == {}
+
+    @pytest.mark.asyncio
+    async def test_create_node_uses_stored_preferred_name(self):
+        # When a Babel-computed preferred_name is present, create_node uses it verbatim
+        # for the clique label -- even a >demote_labels_longer_than (15) name -- and does
+        # NOT run the fallback algorithm. app=None proves no Redis is touched on this path.
+        canonical = "MONDO:0011996"
+        eids = {canonical: [{"i": canonical, "l": "raw list label"}]}
+        node = await create_node(
+            app=None,
+            canonical_id=canonical,
+            equivalent_ids=eids,
+            types={canonical: ["biolink:Disease"]},
+            info_contents={canonical: None},
+            preferred_names={canonical: "Infant Acute Undifferentiated Leukemia"},
+            conflations={"GeneProtein": False, "DrugChemical": False},
+        )
+        assert node["id"] == {"identifier": canonical, "label": "Infant Acute Undifferentiated Leukemia"}
+
+    @pytest.mark.asyncio
+    async def test_create_node_empty_preferred_name_falls_back(self):
+        # An empty stored preferred_name ("" -- Babel emitted none) must fall through to
+        # the legacy algorithm, which picks the clique's own label. No conflation => no Redis.
+        canonical = "MONDO:0011996"
+        eids = {canonical: [{"i": canonical, "l": "Leukemia"}]}
+        node = await create_node(
+            app=None,
+            canonical_id=canonical,
+            equivalent_ids=eids,
+            types={canonical: ["biolink:Disease"]},
+            info_contents={canonical: None},
+            preferred_names={canonical: ""},
+            conflations={"GeneProtein": False, "DrugChemical": False},
+        )
+        assert node["id"] == {"identifier": canonical, "label": "Leukemia"}
 
     def test_merge_node_attributes(self):
         node_a = {

@@ -8,7 +8,7 @@ ARG DATA=/data
 RUN apt-get update
 RUN apt-get -y upgrade
 RUN apt-get -y install wget
-RUN apt-get -y install git gcc
+RUN apt-get -y install git gcc make
 
 # Create nru user
 RUN mkdir -p ${ROOT}

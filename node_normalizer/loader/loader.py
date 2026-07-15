@@ -58,7 +58,7 @@ def redis_connect(db_name: str) -> redis.Redis:
     documentation/Redis.md).
     """
     with open(REDIS_CONFIG_PATH) as config_file:
-        config = yaml.load(config_file, yaml.FullLoader)[db_name]
+        config = yaml.safe_load(config_file)[db_name]
 
     if config.get("is_cluster"):
         raise ValueError(
@@ -93,12 +93,11 @@ def validate_compendium(in_file) -> bool:
 
 
 def get_compendia(compendium_directory: Path, data_files: list) -> list:
-    """Return the list of compendium file paths to load, warning on any missing."""
+    """Return the list of compendium file paths to load, raising if any are missing."""
     file_list = [compendium_directory / file_name for file_name in data_files]
-    for file in file_list:
-        if not file.exists():
-            # This should probably raise an exception
-            logger.warning(f"file not found: {file.name}")
+    missing = [str(file) for file in file_list if not file.exists()]
+    if missing:
+        raise FileNotFoundError(f"Compendium file(s) not found: {', '.join(missing)}")
     return file_list
 
 
@@ -270,10 +269,8 @@ def load_all(block_size: int = 100_000) -> bool:
     if test_mode == 1:
         logger.debug("Test mode enabled. No data will be produced.")
 
+    # Raises FileNotFoundError if any named compendium is missing.
     compendia = get_compendia(compendium_directory, data_files)
-    if len(compendia) != len(data_files):
-        logger.error("Error: 1 or more data files were incorrect")
-        return False
 
     types_prefixes_redis = redis_connect("curie_to_bl_type_db")
     for comp in compendia:

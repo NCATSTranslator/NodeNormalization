@@ -2,6 +2,7 @@
 import json
 import time
 
+import pytest
 import reasoner_pydantic
 import requests
 import fastapi
@@ -10,6 +11,10 @@ from pathlib import Path
 from node_normalizer.util import LoggingUtil
 
 logger = LoggingUtil.init_logging()
+
+# Uses an older docker-compose harness that builds the full app image; not yet
+# wired up for CI (tracked in issue #383).
+pytestmark = pytest.mark.skip(reason="requires docker-compose harness, see #383")
 
 premerged_response = Path(__file__).parent.parent / "resources" / "premerged_response.json"
 

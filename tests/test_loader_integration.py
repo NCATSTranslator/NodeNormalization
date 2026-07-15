@@ -106,6 +106,7 @@ def test_load_populates_correct_databases(loaded_redis):
     eq_id_to_id = _client(host, port, DB_INDEX["eq_id_to_id_db"])
     id_to_eqids = _client(host, port, DB_INDEX["id_to_eqids_db"])
     id_to_type = _client(host, port, DB_INDEX["id_to_type_db"])
+    info_content = _client(host, port, DB_INDEX["info_content_db"])
     chemical_drug = _client(host, port, DB_INDEX["chemical_drug_db"])
 
     # The compendium populated the id databases.
@@ -115,6 +116,12 @@ def test_load_populates_correct_databases(loaded_redis):
 
     # eq_id_to_id keys are upper-cased; a known Cell.txt id resolves.
     assert eq_id_to_id.get("UMLS:C0229659".upper()) is not None
+
+    # info_content_db is now a clique-property store keyed by canonical id: its value
+    # is a JSON dict {"preferred_name", "ic"}, not a bare float. Cell.txt has no
+    # preferred_name, so it loads as "" alongside the ic.
+    props = json.loads(info_content.get("UMLS:C0229659"))
+    assert props == {"preferred_name": "", "ic": "100"}
 
     # The conflation landed in chemical_drug_db (db 6)...
     for member in conflation_members:

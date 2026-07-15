@@ -30,6 +30,7 @@
         "SmallMolecule.txt",
         "umls.txt"
     ],
+    "biolink_version": "v4.4.3",
     "test_mode": 0,
     "debug_messages": 0,
     "conflations": [

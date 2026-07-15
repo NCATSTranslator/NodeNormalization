@@ -5,6 +5,7 @@
     "redis_port": 6379,
     "redis_password": "",
     "data_files": ["Cell.txt"],
+    "biolink_version": "v4.4.3",
     "test_mode": 0,
     "debug_messages": 0,
     "conflations": [],

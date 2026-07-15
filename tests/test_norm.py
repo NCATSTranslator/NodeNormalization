@@ -29,6 +29,7 @@ app.state.id_to_type_db = MockRedis({"MONDO:0005002": "biolink:Disease"})
 app.state.curie_to_bl_type_db = MockRedis({})
 app.state.info_content_db = MockRedis({})
 app.state.gene_protein_db = MockRedis({})
+app.state.chemical_drug_db = MockRedis({})
 #app.state.ancestor_map = {"biolink:Disease": ["biolink:Disease", "biolink:NamedThing"]}
 app.state.toolkit = Toolkit()
 app.state.ancestor_map = {}
@@ -99,7 +100,7 @@ def test_empty():
     # GET
     response = client.get("/get_normalized_nodes", params={"curie": []})
     assert response.status_code == 422
-    assert response.reason == "Unprocessable Entity"
+    assert response.reason_phrase == "Unprocessable Entity"
     result = json.loads(response.text)
     assert result["detail"][0]["msg"] == "ensure this value has at least 1 items"
     assert result["detail"][0]["loc"] == ["query", "curie"]
@@ -107,7 +108,7 @@ def test_empty():
     # POST
     response = client.post("/get_normalized_nodes", json={"curies": []})
     assert response.status_code == 422
-    assert response.reason == "Unprocessable Entity"
+    assert response.reason_phrase == "Unprocessable Entity"
     result = json.loads(response.text)
     assert result["detail"][0]["msg"] == "ensure this value has at least 1 items"
     assert result["detail"][0]["loc"] == ["body", "curies"]

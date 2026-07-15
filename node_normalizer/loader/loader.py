@@ -5,7 +5,7 @@ populates the backend Redis databases that the frontend queries.
 This is a batch script — read a file, fill a pipeline, execute, repeat — so it
 is written synchronously against redis-py. It is invoked one file at a time by
 the loader Helm chart (which generates a single-file config.json per Kubernetes
-Job and runs `python load.py`); see documentation/Development.md.
+Job and runs `python load.py`); see documentation/Loader.md.
 """
 import json
 from functools import lru_cache
@@ -28,10 +28,20 @@ _toolkit = None
 
 
 def _get_toolkit() -> Toolkit:
-    """Build the Biolink toolkit lazily so importing the loader stays cheap."""
+    """
+    Build the Biolink toolkit lazily so importing the loader stays cheap.
+
+    The Biolink Model version is pinned by the `biolink_version` key in
+    config.json (a tag, branch, or commit in the biolink-model repo) so that a
+    load computes ancestors against the same model Babel built the data with,
+    rather than whatever version bmt happens to default to.
+    """
     global _toolkit
     if _toolkit is None:
-        _toolkit = Toolkit()
+        biolink_version = get_config()["biolink_version"]
+        url = f"https://raw.githubusercontent.com/biolink/biolink-model/{biolink_version}/biolink-model.yaml"
+        logger.info(f"Initializing Biolink Model Toolkit from {url}")
+        _toolkit = Toolkit(url)
     return _toolkit
 
 
@@ -42,6 +52,23 @@ def get_ancestors(input_type: str) -> list:
     if input_type not in ancestors:
         ancestors = [input_type] + ancestors
     return ancestors
+
+
+def _accumulate_source_prefixes(source_prefixes: dict, identifiers: list, semantic_types: list) -> None:
+    """
+    Fold one compendium line's CURIE-prefix counts into every implied semantic
+    type. The prefixes are counted once for the line and then added to each
+    ancestor bucket, rather than re-splitting every identifier once per type.
+    """
+    line_prefix_counts: dict = {}
+    for equivalent_id in identifiers:
+        source_prefix = equivalent_id["i"].split(":", 1)[0]
+        line_prefix_counts[source_prefix] = line_prefix_counts.get(source_prefix, 0) + 1
+
+    for semantic_type in semantic_types:
+        type_counts = source_prefixes.setdefault(semantic_type, {})
+        for source_prefix, count in line_prefix_counts.items():
+            type_counts[source_prefix] = type_counts.get(source_prefix, 0) + count
 
 
 @lru_cache(maxsize=None)
@@ -58,7 +85,7 @@ def redis_connect(db_name: str) -> redis.Redis:
     documentation/Redis.md).
     """
     with open(REDIS_CONFIG_PATH) as config_file:
-        config = yaml.load(config_file, yaml.FullLoader)[db_name]
+        config = yaml.safe_load(config_file)[db_name]
 
     if config.get("is_cluster"):
         raise ValueError(
@@ -71,10 +98,38 @@ def redis_connect(db_name: str) -> redis.Redis:
         host=host["host_name"],
         port=int(host["port"]),
         db=config["db"],
-        password=config["password"] or None,
+        password=config.get("password") or None,
         ssl=config.get("ssl_enabled", False),
         decode_responses=True,
     )
+
+
+def disable_periodic_save() -> None:
+    """
+    Turn off automatic RDB snapshots (`CONFIG SET save ""`) on every backend
+    Redis for the duration of the load.
+
+    The NodeNorm backend databases are write-once: they are created empty,
+    populated by a load, then persisted with a single *manual* BGSAVE (per the
+    loader SOP) and copied elsewhere to seed future `mode: restore` loads. The
+    default `save 300 1000000` therefore just forks a multi-GB BGSAVE every few
+    minutes during the write storm for no benefit — on the 150 GB+ databases the
+    copy-on-write churn is a real drag. A crashed load leaves the database empty
+    rather than partial, which is fine because loads are re-runnable.
+
+    Best-effort: a server that refuses CONFIG SET (e.g. a locked-down managed
+    Redis) is logged and skipped rather than failing the load. CONFIG SET save
+    is server-wide, so this hits each backend instance once.
+    """
+    with open(REDIS_CONFIG_PATH) as config_file:
+        db_names = list(yaml.safe_load(config_file).keys())
+
+    for db_name in db_names:
+        try:
+            redis_connect(db_name).config_set("save", "")
+            logger.info(f"Disabled periodic RDB save on {db_name} for the load.")
+        except Exception as e:
+            logger.warning(f"Could not disable periodic save on {db_name}: {e}")
 
 
 def validate_compendium(in_file) -> bool:
@@ -93,12 +148,11 @@ def validate_compendium(in_file) -> bool:
 
 
 def get_compendia(compendium_directory: Path, data_files: list) -> list:
-    """Return the list of compendium file paths to load, warning on any missing."""
+    """Return the list of compendium file paths to load, raising if any are missing."""
     file_list = [compendium_directory / file_name for file_name in data_files]
-    for file in file_list:
-        if not file.exists():
-            # This should probably raise an exception
-            logger.warning(f"file not found: {file.name}")
+    missing = [str(file) for file in file_list if not file.exists()]
+    if missing:
+        raise FileNotFoundError(f"Compendium file(s) not found: {', '.join(missing)}")
     return file_list
 
 
@@ -120,10 +174,12 @@ def load_compendium(compendium_filename, block_size: int, test_mode: int = 0) ->
     id2type_redis = redis_connect("id_to_type_db")
     info_content_redis = redis_connect("info_content_db")
 
-    term2id_pipeline = term2id_redis.pipeline()
-    id2eqids_pipeline = id2eqids_redis.pipeline()
-    id2type_pipeline = id2type_redis.pipeline()
-    info_content_pipeline = info_content_redis.pipeline()
+    # transaction=False: this is a bulk load, not an atomic update, so skip the
+    # MULTI/EXEC framing around every flushed block.
+    term2id_pipeline = term2id_redis.pipeline(transaction=False)
+    id2eqids_pipeline = id2eqids_redis.pipeline(transaction=False)
+    id2type_pipeline = id2type_redis.pipeline(transaction=False)
+    info_content_pipeline = info_content_redis.pipeline(transaction=False)
 
     line_counter = 0
     with open(compendium_filename, "r", encoding="utf-8") as compendium:
@@ -141,15 +197,7 @@ def load_compendium(compendium_filename, block_size: int, test_mode: int = 0) ->
             semantic_types = get_ancestors(instance["type"])
 
             # Accumulate prefix statistics for the leaf type and every ancestor.
-            for semantic_type in semantic_types:
-                if source_prefixes.get(semantic_type) is None:
-                    source_prefixes[semantic_type] = {}
-                for equivalent_id in instance["identifiers"]:
-                    source_prefix = equivalent_id["i"].split(":")[0]
-                    if source_prefixes[semantic_type].get(source_prefix) is None:
-                        source_prefixes[semantic_type][source_prefix] = 1
-                    else:
-                        source_prefixes[semantic_type][source_prefix] += 1
+            _accumulate_source_prefixes(source_prefixes, instance["identifiers"], semantic_types)
 
             # The Redis writes are independent of the semantic type, so do them
             # once per line rather than once per ancestor.
@@ -170,10 +218,10 @@ def load_compendium(compendium_filename, block_size: int, test_mode: int = 0) ->
                 id2type_pipeline.execute()
                 info_content_pipeline.execute()
 
-                term2id_pipeline = term2id_redis.pipeline()
-                id2eqids_pipeline = id2eqids_redis.pipeline()
-                id2type_pipeline = id2type_redis.pipeline()
-                info_content_pipeline = info_content_redis.pipeline()
+                term2id_pipeline = term2id_redis.pipeline(transaction=False)
+                id2eqids_pipeline = id2eqids_redis.pipeline(transaction=False)
+                id2type_pipeline = id2type_redis.pipeline(transaction=False)
+                info_content_pipeline = info_content_redis.pipeline(transaction=False)
 
                 logger.info(f"{line_counter} {compendium_filename} lines processed")
 
@@ -196,7 +244,7 @@ def load_conflation(conflation: dict, conflation_directory: Path, block_size: in
     """Load a conflation file: each identifier in a clique -> the whole clique line."""
     conflation_file = conflation["file"]
     conflation_redis = redis_connect(conflation["redis_db"])
-    conflation_pipeline = conflation_redis.pipeline()
+    conflation_pipeline = conflation_redis.pipeline(transaction=False)
 
     line_counter = 0
     with open(f"{conflation_directory}/{conflation_file}", "r", encoding="utf-8") as cfile:
@@ -211,7 +259,7 @@ def load_conflation(conflation: dict, conflation_directory: Path, block_size: in
 
             if test_mode != 1 and line_counter % block_size == 0:
                 conflation_pipeline.execute()
-                conflation_pipeline = conflation_redis.pipeline()
+                conflation_pipeline = conflation_redis.pipeline(transaction=False)
                 logger.info(f"{line_counter} {conflation_file} lines processed")
 
         if test_mode != 1:
@@ -232,9 +280,9 @@ def merge_semantic_meta_data(test_mode: int = 0) -> None:
     """
     types_prefixes_redis = redis_connect("curie_to_bl_type_db")
 
-    meta_data_keys = [key for key in types_prefixes_redis.keys("file-*") if key != "semantic_types"]
+    meta_data_keys = types_prefixes_redis.keys("file-*")
 
-    pipeline = types_prefixes_redis.pipeline()
+    pipeline = types_prefixes_redis.pipeline(transaction=False)
     for meta_data_key in meta_data_keys:
         pipeline.get(meta_data_key)
     meta_data = pipeline.execute()
@@ -251,7 +299,7 @@ def merge_semantic_meta_data(test_mode: int = 0) -> None:
             for curie_prefix, count in curie_counts.items():
                 sources_prefix[bl_type][curie_prefix] = sources_prefix[bl_type].get(curie_prefix, 0) + count
 
-    pipeline = types_prefixes_redis.pipeline()
+    pipeline = types_prefixes_redis.pipeline(transaction=False)
     if sources_prefix:
         pipeline.lpush("semantic_types", *list(sources_prefix.keys()))
     for bl_type, counts in sources_prefix.items():
@@ -275,11 +323,11 @@ def load_all(block_size: int = 100_000) -> bool:
 
     if test_mode == 1:
         logger.debug("Test mode enabled. No data will be produced.")
+    else:
+        disable_periodic_save()
 
+    # Raises FileNotFoundError if any named compendium is missing.
     compendia = get_compendia(compendium_directory, data_files)
-    if len(compendia) != len(data_files):
-        logger.error("Error: 1 or more data files were incorrect")
-        return False
 
     types_prefixes_redis = redis_connect("curie_to_bl_type_db")
     for comp in compendia:
@@ -289,7 +337,7 @@ def load_all(block_size: int = 100_000) -> bool:
 
         source_prefixes = load_compendium(comp, block_size, test_mode)
 
-        pipeline = types_prefixes_redis.pipeline()
+        pipeline = types_prefixes_redis.pipeline(transaction=False)
         # @TODO add meta data about files eg. checksum to this object
         pipeline.set(f"file-{comp}", json.dumps({"source_prefixes": source_prefixes}))
         if test_mode != 1:

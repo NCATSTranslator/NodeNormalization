@@ -71,6 +71,7 @@ def loaded_redis(tmp_path, monkeypatch):
         config = {
             "compendium_directory": str(RESOURCES),
             "conflation_directory": str(tmp_path),
+            "biolink_version": "v4.4.3",
             "test_mode": 0,
             "data_files": ["Cell.txt"],
             "conflations": [

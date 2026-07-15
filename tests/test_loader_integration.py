@@ -73,7 +73,7 @@ def loaded_redis(tmp_path, monkeypatch):
             "conflation_directory": str(tmp_path),
             "biolink_version": "v4.4.3",
             "test_mode": 0,
-            "data_files": ["Cell.txt"],
+            "data_files": ["Cell.txt", "Disease.txt"],
             "conflations": [
                 {
                     "types": ["biolink:ChemicalEntity", "biolink:Drug"],
@@ -123,6 +123,11 @@ def test_load_populates_correct_databases(loaded_redis):
     # preferred_name, so it loads as "" alongside the ic.
     props = json.loads(info_content.get("UMLS:C0229659"))
     assert props == {"preferred_name": "", "ic": "100"}
+
+    # A clique that carries both a preferred_name and an IC (Disease.txt) round-trips
+    # both through db 5, keyed by its canonical id.
+    disease_props = json.loads(info_content.get("UMLS:C4288892"))
+    assert disease_props == {"preferred_name": "Infant Acute Undifferentiated Leukemia", "ic": 100.0}
 
     # The conflation landed in chemical_drug_db (db 6)...
     for member in conflation_members:

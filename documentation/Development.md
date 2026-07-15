@@ -93,6 +93,31 @@ Integration tests are marked `integration` and start a real Redis via
 `testcontainers` (see `tests/test_loader_integration.py`). CI runs both in
 `.github/workflows/test.yml`.
 
+### Writing loader integration tests
+
+`tests/test_loader_integration.py` is the pattern to copy. Two non-obvious
+things about driving the loader from a test:
+
+- **`redis_connect` is `@lru_cache`d.** It memoizes one client per db name for
+  the life of the process, so call `loader.loader.redis_connect.cache_clear()`
+  before and after a test that points it at a throwaway Redis — otherwise a
+  later test reuses the previous container's (now-dead) connection.
+- **Patch paths on the loader module, not on `config`.** The loader does
+  `from ..config import get_config, REDIS_CONFIG_PATH`, so it holds its *own*
+  reference to `REDIS_CONFIG_PATH`. To redirect it, `monkeypatch.setattr` on
+  `node_normalizer.loader.loader.REDIS_CONFIG_PATH`. `CONFIG_PATH` is different:
+  `get_config()` reads `config.CONFIG_PATH` at call time, so patch it on
+  `node_normalizer.config`.
+
+### Dependency landmine: requests / docker / testcontainers
+
+`requests >= 2.32` changed its `HTTPAdapter`, which breaks the `docker` SDK
+< 7.1 that `testcontainers` pulls in — its unix-socket adapter can no longer
+reach the Docker daemon, and `testcontainers` (hence every `integration` test)
+fails at container startup. If you bump `requests`, keep `docker>=7.1.0` pinned
+in `requirements-test.txt`. This is easy to misdiagnose as a Docker/environment
+problem rather than a dependency conflict.
+
 ## Backlog (out of scope for the loader-reorg PR)
 
 Filed as issues on the **NodeNorm v2.5.0** milestone:

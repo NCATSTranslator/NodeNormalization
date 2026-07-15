@@ -11,7 +11,7 @@ from node_normalizer.util import LoggingUtil
 
 logger = LoggingUtil.init_logging()
 
-premerged_response = Path(__file__).parent / "resources" / "premerged_response.json"
+premerged_response = Path(__file__).parent.parent / "resources" / "premerged_response.json"
 
 
 def test_async_query_callback(session):

@@ -13,16 +13,16 @@ import fastapi
 from reasoner_pydantic import Response
 
 # Need to add to sources root to avoid linter warnings
-from .helpers.redis_mocks import mock_get_equivalent_curies
-from .helpers.redis_mocks import mock_get_ic
+from ..helpers.redis_mocks import mock_get_equivalent_curies
+from ..helpers.redis_mocks import mock_get_ic
 
-premerged_response = Path(__file__).parent / "resources" / "premerged_response.json"
-postmerged_response = Path(__file__).parent / "resources" / "postmerged_response.json"
+premerged_response = Path(__file__).parent.parent / "resources" / "premerged_response.json"
+postmerged_response = Path(__file__).parent.parent / "resources" / "postmerged_response.json"
 
-premerged_dupe_edge = Path(__file__).parent / "resources" / "premerged_dupe_edge.json"
-postmerged_dupe_edge = Path(__file__).parent / "resources" / "postmerged_dupe_edge.json"
+premerged_dupe_edge = Path(__file__).parent.parent / "resources" / "premerged_dupe_edge.json"
+postmerged_dupe_edge = Path(__file__).parent.parent / "resources" / "postmerged_dupe_edge.json"
 
-input_set = Path(__file__).parent / "resources" / "input_set.json"
+input_set = Path(__file__).parent.parent / "resources" / "input_set.json"
 
 
 class TestServer:

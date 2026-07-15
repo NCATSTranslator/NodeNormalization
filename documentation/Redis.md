@@ -26,7 +26,7 @@ index is always 0 and the databases are separated by host.
 NodeNorm used to support a clustered Redis backend (`is_cluster: true`) via the
 `redis-py-cluster` package. It was removed (see the "Drop Redis cluster support"
 commit; the last release that shipped it was **v2.4.1**), because no deployment
-used it — `is_cluster` is `false` for all seven databases in every values file
+uses it any more — `is_cluster` is `false` for all seven databases in every values file
 (ncats dev/test/prod, RENCI exp) — and the cluster branch was the main source of
 complexity in the codebase:
 

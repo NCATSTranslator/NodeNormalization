@@ -121,9 +121,8 @@ async def status() -> Dict:
 
     return {
         "status": "running",
-        "openapi_version": app.openapi_schema["info"]["version"],
+        "version": nodenorm_version,
         "backend": "redis",
-        "nodenorm_version": nodenorm_version,
         "babel_version": babel_version,
         "babel_version_url": babel_version_url,
         "biolink_model": {

@@ -5,13 +5,15 @@ WORKDIR /code
 
 # install library
 COPY ./requirements.txt requirements.txt
+COPY ./requirements-loader.txt requirements-loader.txt
 COPY ./node_normalizer node_normalizer
 COPY ./config.json config.json
 COPY ./redis_config.yaml redis_config.yaml
 COPY ./load.py load.py
 
-# install requirements
-RUN pip install -r requirements.txt
+# install requirements (frontend + loader; the loader Helm chart runs load.py
+# from this image)
+RUN pip install -r requirements.txt -r requirements-loader.txt
 
 RUN chmod 777 ./
 

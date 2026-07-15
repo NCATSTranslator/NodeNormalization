@@ -5,14 +5,16 @@ WORKDIR /code
 
 # install library
 COPY ./requirements.txt requirements.txt
+COPY ./requirements-loader.txt requirements-loader.txt
+COPY ./requirements-test.txt requirements-test.txt
 COPY ./node_normalizer node_normalizer
 COPY ./tests/config.json config.json
 COPY ./tests/redis_config.yaml redis_config.yaml
 COPY ./load.py load.py
 COPY ./tests tests
 
-# install requirements
-RUN pip install -r requirements.txt
+# install requirements (frontend + loader + test)
+RUN pip install -r requirements.txt -r requirements-loader.txt -r requirements-test.txt
 
 RUN chmod 777 ./
 

@@ -21,4 +21,4 @@ def test_status_openapi_version_and_backend():
     body = TestClient(app).get("/status").json()
 
     assert body["backend"] == "redis"
-    assert body["openapi_version"] == app.openapi_schema["info"]["version"]
+    assert body["version"] == "v" + app.openapi_schema["info"]["version"]

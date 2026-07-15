@@ -138,10 +138,10 @@ def load_compendium(compendium_filename, block_size: int, test_mode: int = 0) ->
             # prefix statistics for each implied (ancestor) type as well.
             semantic_types = get_ancestors(instance["type"])
 
+            # Accumulate prefix statistics for the leaf type and every ancestor.
             for semantic_type in semantic_types:
                 if source_prefixes.get(semantic_type) is None:
                     source_prefixes[semantic_type] = {}
-
                 for equivalent_id in instance["identifiers"]:
                     source_prefix = equivalent_id["i"].split(":")[0]
                     if source_prefixes[semantic_type].get(source_prefix) is None:
@@ -149,13 +149,14 @@ def load_compendium(compendium_filename, block_size: int, test_mode: int = 0) ->
                     else:
                         source_prefixes[semantic_type][source_prefix] += 1
 
-                    term2id_pipeline.set(equivalent_id["i"].upper(), identifier)
-
-                id2eqids_pipeline.set(identifier, json.dumps(instance["identifiers"]))
-                id2type_pipeline.set(identifier, instance["type"])
-
-                if "ic" in instance and instance["ic"] is not None:
-                    info_content_pipeline.set(identifier, instance["ic"])
+            # The Redis writes are independent of the semantic type, so do them
+            # once per line rather than once per ancestor.
+            for equivalent_id in instance["identifiers"]:
+                term2id_pipeline.set(equivalent_id["i"].upper(), identifier)
+            id2eqids_pipeline.set(identifier, json.dumps(instance["identifiers"]))
+            id2type_pipeline.set(identifier, instance["type"])
+            if "ic" in instance and instance["ic"] is not None:
+                info_content_pipeline.set(identifier, instance["ic"])
 
             if test_mode != 1 and line_counter % block_size == 0:
                 term2id_pipeline.execute()

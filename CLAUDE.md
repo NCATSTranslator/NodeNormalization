@@ -59,8 +59,8 @@ Babel Compendia Files → loader.py → Redis (7 DBs) → FastAPI (server.py) �
 | 1 | id_to_eqids_db | ID → all equivalent IDs |
 | 2 | id_to_type_db | ID → semantic types |
 | 3 | curie_to_bl_type_db | CURIE → Biolink types |
-| 4 | info_content_db | Information content scores |
-| 5 | gene_protein_db | Gene/protein conflation |
+| 4 | gene_protein_db | Gene/protein conflation |
+| 5 | info_content_db | Information content scores |
 | 6 | chemical_drug_db | Chemical/drug conflation |
 
 ### Key Modules

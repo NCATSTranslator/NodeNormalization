@@ -7,5 +7,19 @@
     "data_files": ["Cell.txt"],
     "test_mode": 0,
     "debug_messages": 0,
-    "conflations": []
+    "conflations": [],
+    "preferred_name_boost_prefixes": {
+        "biolink:ChemicalEntity": [
+            "DRUGBANK",
+            "DrugCentral",
+            "CHEBI",
+            "MESH",
+            "CHEMBL.COMPOUND",
+            "GTOPDB",
+            "HMDB",
+            "RXCUI",
+            "PUBCHEM.COMPOUND"
+        ]
+    },
+    "demote_labels_longer_than": 15
 }

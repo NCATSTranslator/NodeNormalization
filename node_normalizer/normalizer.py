@@ -865,7 +865,9 @@ async def get_curie_prefixes(
             # set the return data
             ret_val[item] = {'curie_prefix': curies}
     else:
-        types = await app.state.curie_to_bl_type_db.lrange('semantic_types', 0, -1, encoding='utf-8')
+        # The loader LPUSHes into the semantic_types list once per file, so it
+        # contains many duplicates; dedupe before querying each type.
+        types = set(await app.state.curie_to_bl_type_db.lrange('semantic_types', 0, -1, encoding='utf-8'))
 
         for item in types:
             # get the curies for this type

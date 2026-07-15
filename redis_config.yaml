@@ -47,7 +47,7 @@
 "chemical_drug_db":
   "ssl_enabled": false
   "is_cluster": false
-  "db": 0
+  "db": 6
   "hosts":
     - "host_name": "127.0.0.1"
       "port": "6379"

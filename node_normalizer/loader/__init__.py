@@ -7,6 +7,7 @@ from .loader import (
     get_compendia,
     get_ancestors,
     redis_connect,
+    disable_periodic_save,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "get_compendia",
     "get_ancestors",
     "redis_connect",
+    "disable_periodic_save",
 ]

@@ -73,7 +73,7 @@ def loaded_redis(tmp_path, monkeypatch):
             "conflation_directory": str(tmp_path),
             "biolink_version": "v4.4.3",
             "test_mode": 0,
-            "data_files": ["Cell.txt", "Disease.txt"],
+            "data_files": ["Cell.txt", "Disease.txt", "PhenotypicFeature.txt"],
             "conflations": [
                 {
                     "types": ["biolink:ChemicalEntity", "biolink:Drug"],
@@ -128,6 +128,17 @@ def test_load_populates_correct_databases(loaded_redis):
     # both through db 5, keyed by its canonical id.
     disease_props = json.loads(info_content.get("UMLS:C4288892"))
     assert disease_props == {"preferred_name": "Infant Acute Undifferentiated Leukemia", "ic": 100.0}
+
+    # Taxa are stored per-identifier in the "t" field of the id_to_eqids_db blob (not
+    # in db 5), so they round-trip alongside labels and descriptions. PhenotypicFeature.txt
+    # has a human-taxon clique; its canonical id's identifiers carry the taxon.
+    pheno_ids = json.loads(id_to_eqids.get("HP:0009278"))
+    assert pheno_ids[0] == {
+        "i": "HP:0009278",
+        "l": "Ulnar deviation of the 4th finger",
+        "d": ["Displacement of the 4th finger towards the ulnar side (i.e., towards the 5th finger)."],
+        "t": ["NCBITaxon:9606"],
+    }
 
     # The conflation landed in chemical_drug_db (db 6)...
     for member in conflation_members:

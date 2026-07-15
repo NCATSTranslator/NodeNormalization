@@ -663,7 +663,7 @@ async def get_normalized_nodes(
     node_ids = {c: dereference_ids[c][0]['i'] for c in canonical_nonan
                 if dereference_ids.get(c) and dereference_ids[c][0]}
     if node_ids:
-        raw_props = await app.state.info_content_db.mget(*node_ids.values(), encoding='utf-8')
+        raw_props = await app.state.info_content_db.mget(*node_ids.values(), encoding='utf8')
         by_nodeid = dict(zip(node_ids.values(),
                              (_clique_props(r).get("preferred_name") for r in raw_props)))
         preferred_names = {c: by_nodeid.get(nid) for c, nid in node_ids.items()}

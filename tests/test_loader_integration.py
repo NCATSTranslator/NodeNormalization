@@ -121,6 +121,11 @@ def test_load_populates_correct_databases(loaded_redis):
     # info_content_db is now a clique-property store keyed by canonical id: its value
     # is a JSON dict {"preferred_name", "ic"}, not a bare float. Cell.txt has no
     # preferred_name, so it loads as "" alongside the ic.
+    #
+    # ic here is the *string* "100", not 100.0: Babel encodes ic as a JSON string in
+    # Cell.txt but as a JSON number in Disease.txt (below), and the loader stores
+    # instance["ic"] verbatim without coercing, so db 5 preserves whichever type came
+    # in. _clique_props() tolerates both.
     props = json.loads(info_content.get("UMLS:C0229659"))
     assert props == {"preferred_name": "", "ic": "100"}
 

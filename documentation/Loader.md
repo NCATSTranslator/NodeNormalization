@@ -83,21 +83,27 @@ A backend database is **created empty, loaded once, then frozen**:
 Nothing writes to a database after its initial load. This is why the loader can
 safely disable snapshotting during the load (next section).
 
-## Why the loader disables periodic saves
+## Why persistence is explicit, not periodic
 
-The `redis-r3-external` instances default to `--save 300 1000000` (snapshot every
-5 min if ≥1M keys changed). During a load every hot database easily clears that
-threshold, so Redis forks a **multi-GB BGSAVE every few minutes** throughout the
-write storm. On the 150 GB+ databases the copy-on-write churn from forking under
-continuous writes is a real, pure-waste drag — the periodic snapshot is thrown
-away anyway, because persistence is the deliberate manual `BGSAVE` in step 3.
+The `redis-r3-external` instances are configured with **`save ""`** (no automatic
+RDB snapshots) and `appendonly no`. That is deliberate: no `save <sec> <changes>`
+policy can do what a populate needs. The dirty-key counter blows past any
+threshold within seconds of a load starting, so any policy that eventually
+snapshots *after* a load also forks a **multi-GB BGSAVE repeatedly during** it —
+pure copy-on-write waste on the 150 GB+ databases, and the periodic snapshots are
+thrown away anyway. So persistence is driven explicitly, exactly once, per mode:
 
-So `load_all()` calls `disable_periodic_save()`, which issues `CONFIG SET save ""`
-on each backend at the start of the load. Notes:
+- **`mode: load`** — `load_all()` calls `disable_periodic_save()` (`CONFIG SET
+  save ""`) at the start as belt-and-suspenders, then you BGSAVE all seven
+  instances manually at the end (step 3 above) and copy the RDBs off.
+- **`mode: restore`** — `run_pipe.sh` streams the RDB in, then issues a `BGSAVE`
+  **and waits for it to finish and verify** (`LASTSAVE` advanced,
+  `rdb_last_bgsave_status:ok`) before the Job exits, so a pod restart reloads a
+  complete `dump.rdb`. This wait is the fix for the old fire-and-forget BGSAVE
+  (#390).
 
-- **Scoped to `mode: load` automatically.** `mode: restore` runs no Python, so its
-  instances keep their periodic-save safety net untouched. (That matters: the
-  restore Job's own persistence step is less robust — see #390.)
+`disable_periodic_save()` notes:
+
 - **Best-effort.** A server that refuses `CONFIG SET` is logged and skipped, not
   fatal.
 - **Accepted trade-off:** a crashed load leaves the database *empty* rather than
@@ -187,5 +193,6 @@ Bigger loader-speed ideas that need more than a contained change are filed on th
 - **Overlap the four per-block pipeline flushes** ([#389](https://github.com/NCATSTranslator/NodeNormalization/issues/389))
   — they target independent databases but currently flush serially.
 - **Harden the `mode: restore` BGSAVE** ([#390](https://github.com/NCATSTranslator/NodeNormalization/issues/390))
-  — it's fire-and-forget, so a restored database may not be persisted before the
-  Job exits. (A `translator-devops` chart fix.)
+  — *addressed in the `translator-devops` chart*: `run_pipe.sh` now BGSAVEs and
+  waits for completion (see "Why persistence is explicit, not periodic" above).
+  Close #390 once that chart change ships.

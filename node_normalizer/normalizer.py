@@ -772,7 +772,7 @@ async def create_node(app, canonical_id, equivalent_ids, types, info_contents, p
             # No conflation. We just use the identifiers we've been given.
             identifiers_with_labels = eids
         else:
-            # We have a conflation going on! To replicate Babel's behavior, we need to run the algorithem
+            # We have a conflation going on! To replicate Babel's behavior, we need to run the algorithm
             # on the list of labels corresponding to the first
             # So we need to run the algorithm on the first set of identifiers that have any
             # label whatsoever.

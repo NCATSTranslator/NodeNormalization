@@ -164,33 +164,10 @@ about driving the loader from a test:
   `get_config()` reads `config.CONFIG_PATH` at call time, so patch it on
   `node_normalizer.config`.
 
-### Querying the frontend against loaded data (end-to-end)
-
-To assert on what `get_normalized_nodes` *returns* (not just what keys the loader
-wrote), drive the real frontend against the same testcontainer instead of a
-hand-built mock — it avoids reimplementing the loader's canonical-id/db-5 keying.
-See `test_query_gene_protein_conflation_uses_gene_preferred_name`:
-
-- **Reuse the loader's `redis_config.yaml`.** The loader fixture already writes one
-  pointing every logical db at the container; the frontend's
-  `RedisConnectionFactory.create_connection_pool(path)` consumes that same file. Have
-  the fixture `yield` the config path.
-- **`RedisConnectionFactory.connections` is a process-wide class-level cache.** It's
-  only populated `if not connections`, so a pool left over from another test wins and
-  you attach to a dead container. Set `RedisConnectionFactory.connections = {}` before
-  `create_connection_pool`, and in a `finally` close every connection and clear it again.
-- **Fake the app, skip the Toolkit.** Build `app = SimpleNamespace(state=SimpleNamespace(
-  eq_id_to_id_db=..., id_to_eqids_db=..., info_content_db=..., gene_protein_db=..., ...))`
-  from `get_connection(name)`, and pre-seed `state.ancestor_map` for the types in play
-  (e.g. `{"biolink:Gene": ["biolink:Gene"], ...}`) so `get_ancestors` never needs a
-  Biolink `Toolkit` (`state.toolkit=None`). Only the conflation *fallback* in
-  `create_node` reads Redis beyond these dbs, so the stored-`preferred_name` path needs
-  nothing more.
-
-For a pure-unit version that skips Docker entirely, `tests/test_normalizer.py` drives
-`get_normalized_nodes` / `create_node` against a tiny `_MgetRedis` mock — cheaper, but
-you must construct the redis values (canonical-id keys, db-5 JSON, gene-first conflation
-list) by hand, so it's easy to encode an assumption the loader doesn't actually make.
+To *query* the frontend against data a loader test just wrote (end-to-end, rather
+than asserting on raw Redis keys), see `tests/CLAUDE.md` — it covers reusing the
+fixture's `redis_config.yaml` for `RedisConnectionFactory`, the process-wide
+connection cache, and faking the app.
 
 ### Dependency landmine: requests / docker / testcontainers
 

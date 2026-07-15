@@ -1,6 +1,9 @@
 # Test-only dependencies. Not needed in the production image.
-deepdiff==8.6.1
+deepdiff==8.6.2
 pytest==6.2.5
 pytest-cov==3.0.0
 pytest-asyncio==0.18.3
 testcontainers==3.6.1
+# docker is a transitive dep of testcontainers; pin the floor that is compatible
+# with requests>=2.32 (older docker SDKs break on its HTTPAdapter changes).
+docker>=7.1.0

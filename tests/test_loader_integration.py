@@ -9,6 +9,7 @@ Requires Docker. Marked `integration` so it can be excluded with
 """
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import redis
@@ -16,6 +17,8 @@ from testcontainers.redis import RedisContainer
 
 import node_normalizer.config as config_mod
 import node_normalizer.loader.loader as loader_mod
+import node_normalizer.normalizer as normalizer_mod
+from node_normalizer.redis_adapter import RedisConnectionFactory
 
 pytestmark = pytest.mark.integration
 
@@ -68,18 +71,28 @@ def loaded_redis(tmp_path, monkeypatch):
         conflation_members = ["CHEBI:15377", "DRUGBANK:DB00898"]
         (tmp_path / "DrugChemical.txt").write_text(json.dumps(conflation_members) + "\n")
 
+        # A real gene/protein conflation (CDK2): the gene NCBIGene:1017 conflated with
+        # four UniProtKB protein cliques, gene-first. load_conflation reads it from the
+        # conflation_directory, so copy the resource file there.
+        (tmp_path / "GeneProtein.txt").write_text((RESOURCES / "GeneProtein.txt").read_text())
+
         config = {
             "compendium_directory": str(RESOURCES),
             "conflation_directory": str(tmp_path),
             "biolink_version": "v4.4.3",
             "test_mode": 0,
-            "data_files": ["Cell.txt", "Disease.txt", "PhenotypicFeature.txt"],
+            "data_files": ["Cell.txt", "Disease.txt", "PhenotypicFeature.txt", "Gene.txt", "Protein.txt"],
             "conflations": [
                 {
                     "types": ["biolink:ChemicalEntity", "biolink:Drug"],
                     "file": "DrugChemical.txt",
                     "redis_db": "chemical_drug_db",
-                }
+                },
+                {
+                    "types": ["biolink:Gene", "biolink:Protein"],
+                    "file": "GeneProtein.txt",
+                    "redis_db": "gene_protein_db",
+                },
             ],
         }
         config_path = tmp_path / "config.json"
@@ -92,7 +105,7 @@ def loaded_redis(tmp_path, monkeypatch):
 
         loader_mod.load_all(block_size=100)
 
-        yield host, port, conflation_members
+        yield host, port, conflation_members, redis_config_path
 
         loader_mod.redis_connect.cache_clear()
 
@@ -102,7 +115,7 @@ def _client(host, port, db):
 
 
 def test_load_populates_correct_databases(loaded_redis):
-    host, port, conflation_members = loaded_redis
+    host, port, conflation_members, _redis_config_path = loaded_redis
 
     eq_id_to_id = _client(host, port, DB_INDEX["eq_id_to_id_db"])
     id_to_eqids = _client(host, port, DB_INDEX["id_to_eqids_db"])
@@ -153,3 +166,80 @@ def test_load_populates_correct_databases(loaded_redis):
     # before the fix chemical_drug_db was db 0, so these would leak into it.
     for member in conflation_members:
         assert eq_id_to_id.get(member) is None
+
+
+# The real CDK2 gene/protein conflation: one gene clique conflated with four protein
+# cliques, listed gene-first (from tests/resources/GeneProtein.txt).
+GENE_PROTEIN_CLIQUE = [
+    "NCBIGene:1017",
+    "UniProtKB:B4DDL9",
+    "UniProtKB:E7ESI2",
+    "UniProtKB:G3V5T9",
+    "UniProtKB:P24941",
+]
+
+
+def test_gene_protein_conflation_loaded(loaded_redis):
+    """Loading side: every member of the CDK2 clique maps to the whole gene-first
+    conflation list in gene_protein_db, and the gene's preferred_name lands in db 5."""
+    host, port, _members, _redis_config_path = loaded_redis
+
+    gene_protein = _client(host, port, DB_INDEX["gene_protein_db"])
+    info_content = _client(host, port, DB_INDEX["info_content_db"])
+
+    # Each clique member (gene and every protein) resolves to the same gene-first list.
+    for member in GENE_PROTEIN_CLIQUE:
+        assert json.loads(gene_protein.get(member)) == GENE_PROTEIN_CLIQUE
+
+    # The gene clique's Babel preferred_name is stored in db 5 under its canonical id.
+    assert json.loads(info_content.get("NCBIGene:1017"))["preferred_name"] == "CDK2"
+
+
+@pytest.mark.asyncio
+async def test_query_gene_protein_conflation_uses_gene_preferred_name(loaded_redis):
+    """Querying side: under gene/protein conflation, any protein in the CDK2 clique
+    normalizes to the leading gene identifier (NCBIGene:1017) and the gene's
+    preferred_name ("CDK2") -- not the queried protein's own name. Drives the real
+    get_normalized_nodes against the freshly loaded Redis."""
+    _host, _port, _members, redis_config_path = loaded_redis
+
+    # The frontend builds its connections through this class-level cache; reset it so we
+    # attach to this test's container rather than a pool left over from another test.
+    RedisConnectionFactory.connections = {}
+    await RedisConnectionFactory.create_connection_pool(str(redis_config_path))
+    try:
+        state = SimpleNamespace(
+            eq_id_to_id_db=RedisConnectionFactory.get_connection("eq_id_to_id_db"),
+            id_to_eqids_db=RedisConnectionFactory.get_connection("id_to_eqids_db"),
+            id_to_type_db=RedisConnectionFactory.get_connection("id_to_type_db"),
+            info_content_db=RedisConnectionFactory.get_connection("info_content_db"),
+            gene_protein_db=RedisConnectionFactory.get_connection("gene_protein_db"),
+            chemical_drug_db=RedisConnectionFactory.get_connection("chemical_drug_db"),
+            # Pre-seeded so get_ancestors doesn't need a Biolink Toolkit for this test.
+            ancestor_map={"biolink:Gene": ["biolink:Gene"], "biolink:Protein": ["biolink:Protein"]},
+            toolkit=None,
+        )
+        app = SimpleNamespace(state=state)
+
+        # Query the canonical protein (P24941) and a trembl protein (B4DDL9); both must
+        # collapse onto the gene-led clique.
+        for queried in ["UniProtKB:P24941", "UniProtKB:B4DDL9"]:
+            result = await normalizer_mod.get_normalized_nodes(
+                app, [queried], conflate_gene_protein=True, conflate_chemical_drug=False,
+            )
+            assert result[queried]["id"] == {"identifier": "NCBIGene:1017", "label": "CDK2"}
+
+        # Sanity check the other direction: without conflation the protein keeps its own
+        # identity and preferred_name.
+        result = await normalizer_mod.get_normalized_nodes(
+            app, ["UniProtKB:P24941"], conflate_gene_protein=False, conflate_chemical_drug=False,
+        )
+        assert result["UniProtKB:P24941"]["id"] == {
+            "identifier": "UniProtKB:P24941",
+            "label": "CDK2_HUMAN Cyclin-dependent kinase 2 (sprot)",
+        }
+    finally:
+        for conn in RedisConnectionFactory.get_all_connections().values():
+            conn.close()
+            await conn.wait_closed()
+        RedisConnectionFactory.connections = {}

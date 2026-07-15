@@ -84,8 +84,14 @@ Tests:
 
 ```bash
 pip install -r requirements.txt -r requirements-loader.txt -r requirements-test.txt
-pytest
+
+pytest -m "not integration"   # unit tests, no Docker needed
+pytest -m integration         # loader against a real Redis (needs Docker)
 ```
+
+Integration tests are marked `integration` and start a real Redis via
+`testcontainers` (see `tests/test_loader_integration.py`). CI runs both in
+`.github/workflows/test.yml`.
 
 ## Backlog (out of scope for the loader-reorg PR)
 
@@ -108,3 +114,7 @@ Filed as issues on the **NodeNorm v2.5.0** milestone:
   Turn this into a proper package with dependency groups, and replace the root
   `load.py` shim with a `nodenorm-load` console script (which will require a
   matching chart change).
+- **Wire the docker-compose-based tests into CI** ([#383](https://github.com/NCATSTranslator/NodeNormalization/issues/383)).
+  `.github/workflows/test.yml` runs the headless unit + loader-integration tests;
+  `test_endpoints.py` and `test_callback.py` still need porting off the legacy
+  docker-compose harness.

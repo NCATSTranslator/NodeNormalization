@@ -11,7 +11,7 @@ NodeNorm is really two programs that share some code:
 
 - **The frontend** — a FastAPI service (`node_normalizer/server.py`) that answers
   normalization queries by reading the backend Redis databases. This is what runs
-  in production behind `/1.3`.
+  in production, both at `/` and behind a TRAPI version like `/1.5/`.
 - **The loader** — a batch program (`node_normalizer/loader/`, invoked via the
   root `load.py`) that reads Babel compendium/conflation files and populates those
   Redis databases.

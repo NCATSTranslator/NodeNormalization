@@ -11,7 +11,7 @@
 "id_to_eqids_db":
   "ssl_enabled": false
   "is_cluster": false
-  "db": 0
+  "db": 1
   "hosts":
     - "host_name": "redis"
       "port": "6379"
@@ -20,7 +20,7 @@
 "id_to_type_db":
   "ssl_enabled": false
   "is_cluster": false
-  "db": 0
+  "db": 2
   "hosts":
     - "host_name": "redis"
       "port": "6379"
@@ -29,7 +29,7 @@
 "curie_to_bl_type_db":
   "ssl_enabled": false
   "is_cluster": false
-  "db": 0
+  "db": 3
   "hosts":
     - "host_name": "redis"
       "port": "6379"
@@ -38,7 +38,7 @@
 "gene_protein_db":
   "ssl_enabled": false
   "is_cluster": false
-  "db": 0
+  "db": 4
   "hosts":
     - "host_name": "redis"
       "port": "6379"
@@ -47,7 +47,7 @@
 "chemical_drug_db":
   "ssl_enabled": false
   "is_cluster": false
-  "db": 0
+  "db": 6
   "hosts":
     - "host_name": "redis"
       "port": "6379"
@@ -56,7 +56,7 @@
 "info_content_db":
   "ssl_enabled": false
   "is_cluster": false
-  "db": 0
+  "db": 5
   "hosts":
     - "host_name": "redis"
       "port": "6379"

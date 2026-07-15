@@ -1,0 +1,7 @@
+# Data loader runtime dependencies (node_normalizer/loader/, load.py).
+# The main image installs this alongside requirements.txt because the loader
+# Helm chart runs `python load.py` from the webserver image.
+bmt==1.4.3
+jsonschema~=4.6.0
+pyyaml~=6.0
+redis~=3.5.3

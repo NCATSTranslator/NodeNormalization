@@ -6,7 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 NodeNormalization is a FastAPI microservice for the NIH NCATS Translator project. It normalizes biomedical CURIEs (Compact URIs) and finds equivalent identifiers across databases. Given a CURIE, it returns the preferred CURIE, equivalent identifiers, and Biolink semantic types.
 
-Data comes from Babel (identifier equivalence project) and is stored in Redis across 7 separate databases. The service supports both standalone and clustered Redis.
+Data comes from Babel (identifier equivalence project) and is stored in Redis across 7 separate databases. Standalone Redis only (cluster mode was removed; see `documentation/Redis.md`).
+
+See `documentation/Development.md` for how the frontend and loader are organized and how a data load actually runs.
+
+**Scratch space:** the `data/` directory is git-ignored; use it for scratch/working files in preference to `/tmp`.
 
 ## Common Commands
 
@@ -14,7 +18,9 @@ Data comes from Babel (identifier equivalence project) and is stored in Redis ac
 ```bash
 python -m venv nodeNormalization-env
 source nodeNormalization-env/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt                        # frontend
+pip install -r requirements-loader.txt                 # loader (load.py)
+pip install -r requirements-test.txt                   # to run the tests
 ```
 
 **Run web server:**
@@ -59,16 +65,17 @@ Babel Compendia Files → loader.py → Redis (7 DBs) → FastAPI (server.py) �
 | 1 | id_to_eqids_db | ID → all equivalent IDs |
 | 2 | id_to_type_db | ID → semantic types |
 | 3 | curie_to_bl_type_db | CURIE → Biolink types |
-| 4 | info_content_db | Information content scores |
-| 5 | gene_protein_db | Gene/protein conflation |
+| 4 | gene_protein_db | Gene/protein conflation |
+| 5 | info_content_db | Information content scores |
 | 6 | chemical_drug_db | Chemical/drug conflation |
 
 ### Key Modules
 
 - **`node_normalizer/server.py`** — FastAPI app with all REST endpoints. Uses lifespan events for Redis connection setup/teardown. Root path is `/1.3`.
 - **`node_normalizer/normalizer.py`** — Core logic: `get_normalized_nodes()`, `normalize_message()` (for TRAPI), and equivalent CURIE discovery. Traverses Biolink Model ancestors for semantic type expansion.
-- **`node_normalizer/loader.py`** — `NodeLoader` class that reads flat compendia files and populates Redis. Validates input against `resources/valid_data_format.json`. Batch size: 100,000.
-- **`node_normalizer/redis_adapter.py`** — `RedisConnectionFactory` and `RedisConnection` classes abstracting both clustered and standalone Redis, with async and sync support.
+- **`node_normalizer/loader/`** — the data loader: synchronous module-level functions (`load_all`, `load_compendium`, `load_conflation`, `merge_semantic_meta_data`) that read flat compendia files and populate Redis. Validates input against `resources/valid_data_format.json`. Batch size: 100,000. Invoked via the root `load.py`. See `documentation/Development.md`.
+- **`node_normalizer/config.py`** — shared repo-relative paths (`config.json`, `redis_config.yaml`, `resources/`) and `get_config()`. Used by both frontend and loader.
+- **`node_normalizer/redis_adapter.py`** — async `RedisConnection`/`RedisConnectionFactory` over `aioredis`, used by the frontend. Standalone Redis only; cluster mode was removed (see `documentation/Redis.md`).
 - **`node_normalizer/model/`** — Pydantic request/response models (`input.py`, `response.py`).
 - **`config.json`** — Lists compendia and conflation files to load, preferred name boost prefixes, and feature flags (test mode, debug).
 

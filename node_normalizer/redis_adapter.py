@@ -1,6 +1,4 @@
 from dataclasses import dataclass, field
-import rediscluster
-from rediscluster import RedisCluster
 import aioredis
 from typing import List, Dict
 
@@ -15,7 +13,7 @@ class Resource:
 class RedisInstance:
     ssl_enabled: bool = False
     password: str = ''
-    is_cluster: bool = True
+    is_cluster: bool = False
     hosts: List[Resource] = field(default_factory=list)
     host: Resource = None  # Use if is_cluster == False
     db: int = None  # if instance is not a cluster it supports multiple dbs
@@ -42,8 +40,10 @@ class ConnectionConfig:
 
 class RedisConnection:
     """
-    Abstraction layer for redis interaction.
-    Supporting both Clustered, standalone redis backends.
+    Abstraction layer for a single standalone Redis backend.
+
+    Cluster mode was removed; see documentation/Redis.md for the history and
+    what bringing it back would involve.
     """
     def __init__(self):
         self.connector = None
@@ -53,9 +53,14 @@ class RedisConnection:
         """
         Create redis connection.
         """
+        if redis_instance.is_cluster:
+            raise ValueError(
+                "Redis cluster mode is no longer supported (is_cluster: true). "
+                "See documentation/Redis.md for how it was implemented and how to bring it back."
+            )
+
         # redis_instance contains the password, so this should definitely not be
         # printed except during debugging!
-        # print(f"Creating connection to Redis instance {redis_instance} ...")
         self = RedisConnection()
         other_params = {}
         if redis_instance.password:
@@ -63,75 +68,41 @@ class RedisConnection:
         if redis_instance.ssl_enabled:
             other_params['ssl'] = redis_instance.ssl_enabled
 
-        if redis_instance.is_cluster:
-            host: Resource
-            hosts = [{"host": host.host_name, "port": host.port} for host in redis_instance.hosts]
-            if redis_instance.ssl_enabled:
-                other_params['ssl_cert_reqs'] = False
-
-            redis_connector = RedisCluster(startup_nodes=hosts,
-                                           decode_responses=True,
-                                           skip_full_coverage_check=True,
-                                           **other_params)
-        else:
-            host: Resource = redis_instance.hosts[0]
-            redis_connector = await aioredis.create_redis_pool(f'redis://{host.host_name}:{host.port}',
-                                                               db=redis_instance.db,
-                                                               **other_params)
-
-        self.connector = redis_connector
+        host: Resource = redis_instance.hosts[0]
+        self.connector = await aioredis.create_redis_pool(f'redis://{host.host_name}:{host.port}',
+                                                          db=redis_instance.db,
+                                                          **other_params)
         return self
 
     async def mget(self, *keys, encoding='utf-8'):
         """
         Execute mget command.
         """
-        if isinstance(self.connector, RedisCluster):
-            self.connector: RedisCluster
-            return self.connector.mget(keys=keys)
-        elif isinstance(self.connector, aioredis.commands.Redis):
-            self.connector: aioredis.commands.Redis
-            return await self.connector.mget(*keys, encoding=encoding)
+        return await self.connector.mget(*keys, encoding=encoding)
 
     async def get(self, key, encoding='utf-8'):
         """
         Execute redis get command.
         """
-        if isinstance(self.connector, RedisCluster):
-            self.connector: RedisCluster
-            return self.connector.get(name=key)
-        elif isinstance(self.connector, aioredis.commands.Redis):
-            self.connector: aioredis.commands.Redis
-            return await self.connector.get(key, encoding=encoding)
+        return await self.connector.get(key, encoding=encoding)
 
     async def dbsize(self):
         """
         :return: The number of keys in this Redis database.
         """
-        if isinstance(self.connector, RedisCluster):
-            self.connector: RedisCluster
-            return self.connector.dbsize()
-        elif isinstance(self.connector, aioredis.commands.Redis):
-            self.connector: aioredis.commands.Redis
-            return await self.connector.dbsize()
+        return await self.connector.dbsize()
 
     async def info(self, section):
         """
         :return: The info of this Redis database.
         """
-        if isinstance(self.connector, RedisCluster):
-            self.connector: RedisCluster
-            return self.connector.info(section)
-        elif isinstance(self.connector, aioredis.commands.Redis):
-            self.connector: aioredis.commands.Redis
-            return await self.connector.info(section)
+        return await self.connector.info(section)
 
     async def used_memory_rss_human(self):
         """
         :return: The used memory in human units (e.g. 66.71G)
         """
         return (await self.info('memory')).get('memory').get('used_memory_rss_human')
-
 
     def close(self):
         """
@@ -143,24 +114,13 @@ class RedisConnection:
         """
         Wait for closed underlying connection.
         """
-        if isinstance(self.connector, RedisCluster):
-            self.connector: RedisCluster
-            if self.connector.connection:
-                self.connector.close()
-        elif isinstance(self.connector, aioredis.commands.Redis):
-            self.connector: aioredis.commands.Redis
-            await self.connector.wait_closed()
+        await self.connector.wait_closed()
 
     async def lrange(self, key, start, stop, encoding='utf-8'):
         """
         Execute Lrange command.
         """
-        if isinstance(self.connector, RedisCluster):
-            self.connector: RedisCluster
-            return self.connector.lrange(name=key, start=start, end=stop)
-        elif isinstance(self.connector, aioredis.commands.Redis):
-            self.connector:  aioredis.commands.Redis
-            return await self.connector.lrange(key=key, start=start, stop=stop, encoding=encoding)
+        return await self.connector.lrange(key=key, start=start, stop=stop, encoding=encoding)
 
     def pipeline(self):
         return self.connector.pipeline()
@@ -168,37 +128,17 @@ class RedisConnection:
     async def keys(self, pattern, encoding="utf-8"):
         """
         Execute keys command
-        :param str:
-        :return:
         """
-        if isinstance(self.connector, RedisCluster):
-            self.connector: RedisCluster
-            return self.connector.keys(pattern=pattern)
-        elif isinstance(self.connector, aioredis.commands.Redis):
-            self.connector: aioredis.commands.Redis
-            return await self.connector.keys(pattern=pattern, encoding=encoding)
-    @staticmethod
-    def reset_pipeline(pipeline):
-        if isinstance(pipeline, aioredis.commands.transaction.Pipeline):
-            pipeline: aioredis.commands.transaction.Pipeline
-            pipeline._pipeline = []
-        elif isinstance(pipeline, rediscluster.pipeline.ClusterPipeline):
-            pipeline: rediscluster.pipeline.ClusterPipeline
-            pipeline.reset()
+        return await self.connector.keys(pattern=pattern, encoding=encoding)
 
     @staticmethod
     async def execute_pipeline(pipeline):
-        if isinstance(pipeline, aioredis.commands.transaction.Pipeline):
-            pipeline: aioredis.commands.transaction.Pipeline
-            return await pipeline.execute()
-        elif isinstance(pipeline, rediscluster.pipeline.ClusterPipeline):
-            pipeline: rediscluster.pipeline.ClusterPipeline
-            return pipeline.execute()
+        return await pipeline.execute()
 
 
 class RedisConnectionFactory:
     """
-    Class to create three redis connections based on config
+    Class to create redis connections based on config
     """
     connections: Dict[str, RedisConnection] = {}
 

@@ -2,7 +2,6 @@ import collections
 import itertools
 from pathlib import Path
 
-import json as builtin_json
 import time
 
 import orjson as json
@@ -17,6 +16,7 @@ from bmt.utils import format_element as bmt_format
 from fastapi import FastAPI
 from reasoner_pydantic import KnowledgeGraph, Message, QueryGraph, Result, CURIE, Attribute
 
+from .config import get_config
 from .util import (
     LoggingUtil,
     uniquify_list,
@@ -28,8 +28,7 @@ from .util import (
 logger = LoggingUtil.init_logging()
 
 # Load configuration from config.json.
-with open(Path(__file__).parents[1] / "config.json", "r") as configf:
-    config = builtin_json.load(configf)
+config = get_config()
 
 
 def sort_identifiers_with_boosted_prefixes(identifiers, prefixes):
@@ -866,7 +865,9 @@ async def get_curie_prefixes(
             # set the return data
             ret_val[item] = {'curie_prefix': curies}
     else:
-        types = await app.state.curie_to_bl_type_db.lrange('semantic_types', 0, -1, encoding='utf-8')
+        # The loader LPUSHes into the semantic_types list once per file, so it
+        # contains many duplicates; dedupe before querying each type.
+        types = set(await app.state.curie_to_bl_type_db.lrange('semantic_types', 0, -1, encoding='utf-8'))
 
         for item in types:
             # get the curies for this type

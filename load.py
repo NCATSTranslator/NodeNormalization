@@ -1,27 +1,16 @@
-from node_normalizer.loader import NodeLoader
-import asyncio
 import sys
 
+from node_normalizer.loader import load_all
 
-async def load_redis():
-    """
-    instantiate the class that does all the work
+# Number of records buffered per Redis pipeline before it is flushed. Larger
+# batches mean fewer round trips (faster) at the cost of more memory per batch.
+REDIS_PIPELINE_BATCH_SIZE = 100_000
 
-    :return: Exit code (0 on success, 1 on failure)
-    """
-    loader = NodeLoader()
 
-    # call to load redis instances with normalized node data
-    success: bool = await loader.load(100_000)
-
-    # check the return
+if __name__ == "__main__":
+    success = load_all(block_size=REDIS_PIPELINE_BATCH_SIZE)
     if not success:
-        print('Failed to load node normalization data.')
-        return 1
+        print("Failed to load node normalization data.")
     else:
-        print('Success')
-        return 0
-
-
-if __name__ == '__main__':
-    sys.exit(asyncio.run(load_redis()))
+        print("Success")
+    sys.exit(0 if success else 1)

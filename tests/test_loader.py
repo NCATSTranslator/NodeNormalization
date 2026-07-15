@@ -5,6 +5,7 @@ import pytest
 
 import node_normalizer.loader.loader as loader_mod
 from node_normalizer.loader import get_compendia, load_compendium, validate_compendium
+from node_normalizer.loader.loader import _accumulate_source_prefixes
 
 
 good_json = Path(__file__).parent / "resources" / "datafile.json"
@@ -45,7 +46,7 @@ class _FakeRedis:
     def __init__(self):
         self.sets = []
 
-    def pipeline(self):
+    def pipeline(self, transaction=True):
         return _FakePipeline(self)
 
 
@@ -66,3 +67,30 @@ def test_one_set_per_line():
     num_lines = sum(1 for line in open(good_json) if line.strip())
     assert len(fakes["id_to_eqids_db"].sets) == num_lines
     assert len(fakes["id_to_type_db"].sets) == num_lines
+
+
+def test_accumulate_source_prefixes():
+    """
+    The per-line prefix counter must fold each identifier's prefix into every
+    implied semantic type, accumulating across lines. This pins the behaviour
+    of the optimized (count-once-per-line) accumulation.
+    """
+    source_prefixes = {}
+
+    # Line 1: two NCBIGene + one ENSEMBL, implied by Gene and its ancestors.
+    _accumulate_source_prefixes(
+        source_prefixes,
+        [{"i": "NCBIGene:1"}, {"i": "NCBIGene:2"}, {"i": "ENSEMBL:3"}],
+        ["biolink:Gene", "biolink:BiologicalEntity"],
+    )
+    # Line 2: one NCBIGene, only Gene (a leaf-only type here).
+    _accumulate_source_prefixes(
+        source_prefixes,
+        [{"i": "NCBIGene:9"}],
+        ["biolink:Gene"],
+    )
+
+    assert source_prefixes == {
+        "biolink:Gene": {"NCBIGene": 3, "ENSEMBL": 1},
+        "biolink:BiologicalEntity": {"NCBIGene": 2, "ENSEMBL": 1},
+    }

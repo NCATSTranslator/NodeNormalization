@@ -132,9 +132,18 @@ Filed as issues on the **NodeNorm v2.5.0** milestone:
   is a stored-format change, and `mode: restore` loads RDB backups built by the
   *old* loader — a new server doing `SMEMBERS` on a restored LIST would get
   `WRONGTYPE`. Needs a coordinated loader/server/backup rollout.
-- **`merge_semantic_meta_data` runs once per Job** ([#380](https://github.com/NCATSTranslator/NodeNormalization/issues/380)).
+- **`merge_semantic_meta_data` runs once per Job, and races** ([#380](https://github.com/NCATSTranslator/NodeNormalization/issues/380)).
   It should run once, after all compendium Jobs finish, rather than re-reading
-  every `file-*` key and re-summing on every Job.
+  every `file-*` key and re-summing on every Job. Beyond the redundancy, running
+  it concurrently is a **read-modify-write race**: each Job does `KEYS file-*` →
+  `GET` → sum → `SET <bl_type>`, with no lock, `WATCH`/`MULTI`, or Lua script. Two
+  Jobs that read different subsets of `file-*` keys and then `SET` the same
+  per-type key are last-writer-wins, so the surviving count can reflect only a
+  subset of files. The `file-*` keys themselves don't collide (one distinct key
+  per file) and the aggregates feed only the statistics endpoints
+  (`/get_curie_prefixes`, `/get_semantic_types`), not normalization, so it's
+  tolerated for now — but the fix is architectural (a single post-load merge
+  step), not a lock around this function.
 - **Migrate the frontend off `aioredis`** ([#381](https://github.com/NCATSTranslator/NodeNormalization/issues/381)),
   unmaintained and pinned at 1.3.1. `redis-py` >= 4.2 has asyncio built in, which
   would let the frontend and loader share one client library.

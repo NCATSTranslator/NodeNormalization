@@ -112,6 +112,42 @@ on each backend at the start of the load. Notes:
   line's CURIE-prefix counts once and folds them into every implied Biolink type,
   instead of re-splitting each identifier once per ancestor type.
 
+## Benchmarking a loader change locally
+
+To check whether a loader change actually helps (and, just as important, doesn't
+change what gets written), time a real load against a local Redis:
+
+- **Use a subset of a real split.** `head -n 2000000 SmallMolecule.txt.NN > subset.txt`
+  keeps memory/time sane on a laptop while still crossing Redis's save thresholds.
+- **Drive `load_all` with a throwaway config.** Point it at the subset by
+  monkeypatching `node_normalizer.config.CONFIG_PATH` to a temp `config.json`
+  (remember `biolink_version` is now required); the repo `redis_config.yaml`
+  already targets `127.0.0.1:6379`. Run Redis with `docker run -p 6379:6379
+  redis:6.2-alpine` (6.2 matches production).
+- **Compare against the baseline** by checking out the old loader into the working
+  tree between runs: `git checkout <base-sha> -- node_normalizer/loader`, run, then
+  `git checkout <branch> -- node_normalizer/loader` and run again.
+
+Three gotchas that will otherwise skew the numbers:
+
+- **Warm the Biolink toolkit before timing.** The first `get_ancestors` call builds
+  `bmt.Toolkit`, which *downloads* the pinned biolink-model YAML over the network —
+  a large fixed cost that has nothing to do with load speed. Call
+  `loader.get_ancestors("biolink:<Type>")` once before the timed section.
+- **`CONFIG SET save` is server-wide and sticky.** `disable_periodic_save` (or a
+  manual `CONFIG SET save ""`) persists on the instance across loads, so a later
+  run silently inherits it. Reset `save` to a known value before each run when
+  measuring the snapshot effect.
+- **Correctness check is free:** identical `DBSIZE` on every database across runs
+  means the change preserved output. (`eq_id_to_id_db` exceeds the line count —
+  one key per equivalent identifier, not per line.)
+
+Caveat: a local single-instance Redis with a small subset *understates* the
+snapshot-disable win — on a 2M-key DB a BGSAVE fork is cheap, whereas the whole
+point is the 150 GB+ production instances. It cleanly measures the client-side
+wins (`transaction=False`, prefix-once), which land at ~11% on Protein and more on
+files with deeper type hierarchies / larger cliques.
+
 ## Writing loader integration tests
 
 `tests/test_loader_integration.py` is the pattern to copy. Two non-obvious things

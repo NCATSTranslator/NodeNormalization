@@ -1,6 +1,7 @@
 """FastAPI server."""
 import asyncio
 import os
+import re
 import logging, warnings
 
 from pathlib import Path
@@ -15,9 +16,10 @@ import reasoner_pydantic
 import yaml
 from pydantic import BaseModel
 from bmt import Toolkit
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 
 from .apidocs import get_app_info, construct_open_api_schema
+from .config import SKILL_PATH
 from .model import (
     SemanticTypes,
     CuriePivot,
@@ -184,6 +186,40 @@ async def status() -> Dict:
             }
         },
     }
+
+
+#: Matches the YAML frontmatter block at the very top of a SKILL.md.
+_FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
+
+
+@app.get(
+    "/llms.txt",
+    summary="Instructions for using this API from an AI agent or LLM",
+    description="Returns a Markdown document explaining how to use this service to normalize "
+                "identifiers: which endpoint to call, how to read the response, how to batch, and "
+                "which conflation settings to choose. Intended to be fetched by an agent that has "
+                "been pointed at this instance and needs to work out how to use it. The same "
+                "document is maintained as a "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/tree/master/skills/nodenorm\">"
+                "skill</a> in the NodeNorm repository.",
+    response_class=PlainTextResponse,
+    response_description="Markdown instructions for using this API.",
+)
+async def llms_txt() -> PlainTextResponse:
+    """Serve the agent instructions from skills/nodenorm/SKILL.md."""
+    try:
+        skill = SKILL_PATH.read_text(encoding="utf-8")
+    except OSError:
+        # Most likely an image built without `COPY ./skills`; say so rather than 500ing.
+        logger.warning(f"Could not read agent instructions from {SKILL_PATH}.")
+        raise HTTPException(
+            status_code=404,
+            detail="Agent instructions are not available on this instance. They can be read at "
+                   "https://github.com/NCATSTranslator/NodeNormalization/tree/master/skills/nodenorm",
+        )
+
+    # The frontmatter is Claude Code packaging metadata; it is noise in an llms.txt.
+    return PlainTextResponse(_FRONTMATTER.sub("", skill, count=1).lstrip("\n"))
 
 
 @app.post(

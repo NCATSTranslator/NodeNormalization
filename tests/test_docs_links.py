@@ -13,15 +13,29 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
 
-# Markdown we own. The notebook and anything vendored is deliberately excluded.
-MARKDOWN_FILES = sorted(
-    p for p in REPO_ROOT.rglob("*.md")
-    if not any(part in {"venv", ".venv", "node_modules", ".git", ".pytest_cache", "data"}
-            for part in p.parts)
-)
+#: `data/` holds untracked working copies of helm charts, which are not ours to police.
+EXCLUDED = {"venv", ".venv", "node_modules", ".git", ".pytest_cache", "data"}
 
-# Files that carry links out to GitHub in code rather than in prose.
-SOURCE_WITH_LINKS = [REPO_ROOT / "node_normalizer" / "server.py", REPO_ROOT / "node_normalizer" / "resources" / "openapi.yml"]
+
+def _ours(path):
+    return not any(part in EXCLUDED for part in path.parts)
+
+
+# Markdown we own. Anything vendored is deliberately excluded.
+MARKDOWN_FILES = sorted(p for p in REPO_ROOT.rglob("*.md") if _ours(p))
+
+#: Everything else that can carry a GitHub link. Globbed by extension rather than listed,
+#: because an explicit list is exactly what let a stale Colab badge and a wrong CITATION.cff sit
+#: unnoticed in sibling repos. Scanned only for banned URL forms -- relative links and heading
+#: anchors are a Markdown concern.
+LINK_BEARING_SUFFIXES = {".py", ".yml", ".yaml", ".ipynb", ".cff", ".xml", ".sh", ".toml",
+                         ".snakefile"}
+
+SOURCE_WITH_LINKS = sorted(
+    p for p in REPO_ROOT.rglob("*")
+    if p.is_file() and _ours(p)
+    and (p.suffix in LINK_BEARING_SUFFIXES or p.name.startswith("Dockerfile"))
+)
 
 INLINE_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 HEADING = re.compile(r"^#+\s+(.*)$", re.MULTILINE)

@@ -21,7 +21,8 @@ info:
     to be useful, check /get_semantic_types, which lists the BioLink semantic types
     for which normalization has been attempted, and /get_curie_prefixes, which lists
     the number of times each prefix is used for a semantic type. You can find out more about these API methods at the
-    <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md">Node Normalization API documentation</a>.'
+    <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md">Node Normalization API documentation</a>.
+    If you are an AI agent, GET /llms.txt for instructions on using this service.'
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT

@@ -10,6 +10,8 @@ COPY ./node_normalizer node_normalizer
 COPY ./config.json config.json
 COPY ./redis_config.yaml redis_config.yaml
 COPY ./load.py load.py
+# Agent instructions served at /llms.txt (node_normalizer/config.py: SKILL_PATH).
+COPY ./skills skills
 
 # install requirements (frontend + loader; the loader Helm chart runs load.py
 # from this image)

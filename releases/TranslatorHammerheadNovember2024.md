@@ -1,6 +1,6 @@
 # NodeNorm Translator "Hammerhead" November 2024 Release
 - Babel: [2024oct24](https://stars.renci.org/var/babel_outputs/2024oct24/)
-  ([Babel Translator November 2024 Release](https://github.com/TranslatorSRI/Babel/blob/master/releases/TranslatorHammerheadNovember2024.md))
+  ([Babel Translator November 2024 Release](https://github.com/NCATSTranslator/Babel/blob/main/releases/TranslatorHammerheadNovember2024.md))
 - NodeNorm: [v2.3.18](https://github.com/TranslatorSRI/NodeNormalization/releases/tag/v2.3.18)
 
 Next release: _None as yet_
@@ -16,7 +16,7 @@ Previous release: [Translator "Guppy" August 2024](./TranslatorGuppyAugust2024.m
 ## Documentation
 * Added Guppy release notes ([#294](https://github.com/TranslatorSRI/NodeNormalization/pull/294)).
 
-## Babel updates (from [Babel Translator "Hammerhead" November 2024 Release](https://github.com/TranslatorSRI/Babel/blob/master/releases/TranslatorHammerheadNovember2024.md))
+## Babel updates (from [Babel Translator "Hammerhead" November 2024 Release](https://github.com/NCATSTranslator/Babel/blob/main/releases/TranslatorHammerheadNovember2024.md))
 - [New features] Added taxon information to proteins ([#349](https://github.com/TranslatorSRI/Babel/pull/349))
 - [Updates] Upgraded RxNorm to 09032024.
 - [Updates] Changed NCBIGene download from FTP to HTTP.

@@ -1,6 +1,6 @@
 # NodeNorm Translator "Guppy" August 2024 Release
 - Babel: [2024aug18](https://stars.renci.org/var/babel_outputs/2024aug18/)
-  ([Babel Translator August 2024 Release](https://github.com/TranslatorSRI/Babel/blob/master/releases/TranslatorGuppyAugust2024.md))
+  ([Babel Translator August 2024 Release](https://github.com/NCATSTranslator/Babel/blob/main/releases/TranslatorGuppyAugust2024.md))
 - NodeNorm: [v2.3.16](https://github.com/TranslatorSRI/NodeNormalization/releases/tag/v2.3.16)
 
 Next release: [Translator "Hammerhead" November 2024](./TranslatorHammerheadNovember2024.md)
@@ -13,7 +13,7 @@ Previous release: [Translator "Fugu" July 2024](./TranslatorFuguJuly2024.md)
 ## Technical debt
 * Several improvements to the compendium loader by @gaurav in [#291](https://github.com/TranslatorSRI/NodeNormalization/pull/291)
 
-## Babel updates (from [Babel Translator "Guppy" August 2024 Release](https://github.com/TranslatorSRI/Babel/blob/master/releases/TranslatorGuppyAugust2024.md))
+## Babel updates (from [Babel Translator "Guppy" August 2024 Release](https://github.com/NCATSTranslator/Babel/blob/main/releases/TranslatorGuppyAugust2024.md))
 * [Feature] Added support for generating DuckDB and Parquet files from the compendium and synonym files,
   allowing us to run queries such as looking for all the identically labeled cliques across
   all the compendia. Increased Babel Outputs file size to support DuckDB.

@@ -15,13 +15,13 @@ info:
     are BioLink Model Compliant. Babel decides which identifiers are equivalent, which one is
     preferred, and what a clique is called, so most questions about why a clique looks the way it
     does are really questions about Babel: see
-    <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/Babel.md">Where NodeNorm''s data comes from</a>.
+    <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/Babel.md">Where NodeNorm''s data comes from</a>.
     The <code>babel_version</code> reported by /status identifies exactly which Babel build this
     instance is serving. To determine whether Node Normalization is likely
     to be useful, check /get_semantic_types, which lists the BioLink semantic types
     for which normalization has been attempted, and /get_curie_prefixes, which lists
     the number of times each prefix is used for a semantic type. You can find out more about these API methods at the
-    <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md">Node Normalization API documentation</a>.'
+    <a href="https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md">Node Normalization API documentation</a>.'
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT

@@ -18,7 +18,7 @@ results cannot change until an operator loads a newer build. If you need reprodu
 record the `babel_version` alongside them.
 
 Published Babel builds can be downloaded directly — see Babel's
-[Downloads.md](https://github.com/NCATSTranslator/Babel/blob/master/docs/Downloads.md).
+[Downloads.md](https://github.com/NCATSTranslator/Babel/blob/main/docs/Downloads.md).
 
 ## Cliques, preferred identifiers, and labels
 
@@ -38,7 +38,7 @@ identifier to give a clearer name. Two rules drive this:
   DrugCentral, CHEBI, MESH, GTOPDB — rather than using the Biolink prefix order.
 - Labels longer than a configured length are demoted, and used only if nothing shorter exists.
 
-Babel's [Understanding.md](https://github.com/NCATSTranslator/Babel/blob/master/docs/Understanding.md)
+Babel's [Understanding.md](https://github.com/NCATSTranslator/Babel/blob/main/docs/Understanding.md)
 has the full rules for both.
 
 ## Information content
@@ -74,7 +74,7 @@ Two consequences worth knowing:
   ([#320](https://github.com/NCATSTranslator/NodeNormalization/issues/320)); `individual_types=true`
   will at least give you a Biolink type per identifier.
 
-See Babel's [Conflation.md](https://github.com/NCATSTranslator/Babel/blob/master/docs/Conflation.md).
+See Babel's [Conflation.md](https://github.com/NCATSTranslator/Babel/blob/main/docs/Conflation.md).
 
 ## Descriptions
 
@@ -107,7 +107,7 @@ issues, not NodeNorm issues — see below.
 | NodeNorm returns an error, behaves oddly, or the API itself is wrong | [NodeNorm](https://github.com/NCATSTranslator/NodeNormalization/issues/) |
 
 When filing against Babel, a link to a NodeNorm query showing the problem is very helpful. Babel's
-[NewIssue.md](https://github.com/NCATSTranslator/Babel/blob/master/docs/NewIssue.md) describes what
+[NewIssue.md](https://github.com/NCATSTranslator/Babel/blob/main/docs/NewIssue.md) describes what
 to include and how issues are prioritized.
 
 ## Going deeper
@@ -115,6 +115,6 @@ to include and how issues are prioritized.
 Everything above is what leaks into a NodeNorm response. How Babel actually builds cliques — the
 cross-reference concords, the transitive merge, per-source ingest quirks, the DuckDB and Parquet
 exports, and the pipeline itself — is documented in
-[Babel's documentation index](https://github.com/NCATSTranslator/Babel/blob/master/docs/README.md).
+[Babel's documentation index](https://github.com/NCATSTranslator/Babel/blob/main/docs/README.md).
 The output file formats NodeNorm's loader reads are specified in
-[DataFormats.md](https://github.com/NCATSTranslator/Babel/blob/master/docs/DataFormats.md).
+[DataFormats.md](https://github.com/NCATSTranslator/Babel/blob/main/docs/DataFormats.md).

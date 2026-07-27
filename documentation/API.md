@@ -202,7 +202,7 @@ Example output:
   "version": "2.5.1",
   "backend": "redis",
   "babel_version": "2025mar31",
-  "babel_version_url": "https://github.com/NCATSTranslator/Babel/blob/master/releases/2025mar31.md",
+  "babel_version_url": "https://github.com/NCATSTranslator/Babel/blob/main/releases/2025mar31.md",
   "biolink_model": {
     "tag": "v4.2.6-rc2",
     "url": "https://github.com/biolink/biolink-model/tree/v4.2.6-rc2",
@@ -229,7 +229,7 @@ Output values:
   the cliques being presented. These are usually date-based versions indicating approximately when the Babel build was
   completed. Since the backend databases are written once and never updated in place, this identifies the data
   this instance will return until an operator loads a newer build — record it if you need reproducible results.
-* `babel_version_url` (example: https://github.com/NCATSTranslator/Babel/blob/master/releases/2025mar31.md): A URL you
+* `babel_version_url` (example: https://github.com/NCATSTranslator/Babel/blob/main/releases/2025mar31.md): A URL you
   can use to learn more about this version of Babel, and how it differs from previous and future versions.
 * `biolink_model`: The version of the [Biolink Model](https://github.com/biolink/biolink-model) this instance uses to
   expand a clique's most specific type into the full list of ancestors returned in `type`. Set with the

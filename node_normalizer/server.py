@@ -103,7 +103,7 @@ async def shutdown_event():
                 "semantic types (<code>biolink_model</code>). The backend databases are written once and never "
                 "updated in place, so <code>babel_version</code> identifies the data this instance will return until "
                 "an operator loads a newer build. You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#status\">"
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#status\">"
                 "NodeNorm API documentation</a>.",
     response_description="Information about this NodeNorm instance and the databases it is connected to.",
 )
@@ -281,9 +281,9 @@ async def async_query_task(async_query: reasoner_pydantic.AsyncQuery):
                 "</ol>"
                 "The returned strings can be used with the <code>conflation</code> parameter of /get_setid; "
                 "/get_normalized_nodes has a separate boolean flag for each. You can read "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/Babel.md#conflation\">"
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/Babel.md#conflation\">"
                 "more about conflation</a> or "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_allowed_conflations\">"
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_allowed_conflations\">"
                 "more about this endpoint</a>.",
     response_description="The list of conflations supported by this NodeNorm instance.",
 )
@@ -303,16 +303,16 @@ async def get_conflations() -> ConflationList:
                 "A CURIE that cannot be normalized is returned as a key with a <code>null</code> value rather than "
                 "being left out of the response. "
                 "You can optionally "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/Babel.md#conflation\">"
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/Babel.md#conflation\">"
                 "conflate identifiers</a> if needed: <code>conflate</code> merges genes with the proteins they encode "
                 "(the gene comes first), and <code>drug_chemical_conflate</code> merges drugs with their active "
                 "ingredient (the ingredient comes before any formulations). Conflated cliques are returned as a single "
                 "flat list of equivalent identifiers, so use <code>individual_types</code> if you need to tell the "
                 "members apart. "
                 "You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_normalized_nodes\">NodeNorm API documentation</a>, "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_normalized_nodes\">NodeNorm API documentation</a>, "
                 "and about where the identifiers, labels and information content values come from in "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/Babel.md\">"
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/Babel.md\">"
                 "Where NodeNorm's data comes from</a>.",
     responses={200: {
         "model": Dict[str, Optional[NormalizedNode]],
@@ -362,7 +362,7 @@ async def get_normalized_node_handler(
                 "(<a href=\"https://github.com/NCATSTranslator/NodeNormalization/issues/398\">#398</a>); set it "
                 "explicitly if you care which conflations are applied. "
                 "You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_normalized_nodes\">NodeNorm API documentation</a>.",
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_normalized_nodes\">NodeNorm API documentation</a>.",
     responses={200: {
         "model": Dict[str, Optional[NormalizedNode]],
         "description": "A mapping from each CURIE queried to its normalized clique, or to null if it could not be normalized.",
@@ -399,7 +399,7 @@ async def get_normalized_node_handler_post(curies: CurieList):
                 "Babel build may normalize the same CURIEs differently and so produce a different set ID — see "
                 "<code>babel_version</code> in /status. "
                 "You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_setid\">NodeNorm API documentation</a>.",
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_setid\">NodeNorm API documentation</a>.",
     response_description="The normalized CURIEs and the set ID calculated from them.",
 )
 async def get_setid(
@@ -426,7 +426,7 @@ async def get_setid(
                 "Takes a list of sets, each with its own <code>curies</code> and optional <code>conflations</code>, "
                 "and returns a list of results in the same order. "
                 "You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_setid\">NodeNorm API documentation</a>.",
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_setid\">NodeNorm API documentation</a>.",
     response_description="One result per set submitted, in the order submitted.",
 )
 async def get_setid(
@@ -455,7 +455,7 @@ async def get_setid(
                 "<a href=\"https://github.com/NCATSTranslator/Babel\">Babel</a> compendia loaded into this instance. "
                 "Returns 404 if no semantic types could be found, which usually means the databases have not been "
                 "loaded. You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_semantic_types\">NodeNorm API documentation</a>.",
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_semantic_types\">NodeNorm API documentation</a>.",
     response_description="The distinct Biolink semantic types present in this instance.",
 )
 async def get_semantic_types_handler() -> SemanticTypes:
@@ -485,7 +485,7 @@ async def get_semantic_types_handler() -> SemanticTypes:
                 "instance and are approximate — the load aggregates them concurrently without locking "
                 "(<a href=\"https://github.com/NCATSTranslator/NodeNormalization/issues/380\">#380</a>), so prefer "
                 "Babel's own reports if you need exact figures. You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_curie_prefixes\">NodeNorm API documentation</a>.",
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_curie_prefixes\">NodeNorm API documentation</a>.",
     response_description="A mapping from each semantic type requested to its CURIE prefix counts.",
 )
 async def get_curie_prefixes_handler(
@@ -502,7 +502,7 @@ async def get_curie_prefixes_handler(
     summary="Return the number of times each CURIE prefix appears in an equivalent identifier for a semantic type",
     description="Identical to the GET method of this endpoint, but takes the list of semantic types in a JSON body. "
                 "You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_curie_prefixes\">NodeNorm API documentation</a>.",
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_curie_prefixes\">NodeNorm API documentation</a>.",
     response_description="A mapping from each semantic type requested to its CURIE prefix counts.",
 )
 async def get_curie_prefixes_handler(

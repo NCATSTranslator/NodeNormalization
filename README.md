@@ -30,6 +30,9 @@ which lists the number of times each prefix is used for a semantic type.
 
 For examples of service usage, see the example [notebook](documentation/NodeNormalization.ipynb).
 
+To use NodeNorm from an AI coding agent, see [Using with AI Agents / LLMs](documentation/LLMs.md);
+any running instance also serves agent instructions at `/llms.txt`.
+
 The Node normalization website leverages the [R3 (Redis-REST with referencing)](https://github.com/TranslatorSRI/r3) Redis data design and configuration. 
 
 Users can find the publicly available website at [service](https://nodenormalization-sri.renci.org/docs).

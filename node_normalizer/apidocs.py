@@ -1,7 +1,11 @@
 """
 Open API configuration
 
-# TODO use examples from openapi.yml to drive examples
+`openapi.yml` supplies only the document-level metadata: title, version, description, contact,
+license, terms of service, the Translator/TRAPI extensions, servers and tags. The `paths` section
+is generated from the FastAPI route decorators in `server.py` and cannot be overridden here, so
+per-endpoint documentation belongs on the decorators (`summary`, `description`,
+`response_description`) rather than in this file.
 """
 
 from pathlib import Path
@@ -38,7 +42,7 @@ def construct_open_api_schema(app) -> Dict[str, str]:
         api_docs = load(apd_file, Loader=SafeLoader)
 
     if app.openapi_schema:
-        return app.openapi_schema()
+        return app.openapi_schema
 
     open_api_schema = get_openapi(
         title=api_docs['info']['title'],
@@ -63,6 +67,9 @@ def construct_open_api_schema(app) -> Dict[str, str]:
 
     if 'description' in api_docs['info']:
         open_api_schema['info']['description'] = api_docs['info']['description']
+
+    if 'license' in api_docs['info']:
+        open_api_schema['info']['license'] = api_docs['info']['license']
 
     # adds support to override server root path
     server_root = os.environ.get('SERVER_ROOT', '/')

@@ -12,33 +12,40 @@ class CurieList(BaseModel):
 
     curies: List[str] = Field(
         ...,  # Ellipsis means field is required
-        title='List of CURIEs to normalize',
+        description="The CURIEs to normalize. Any CURIE that cannot be normalized is returned with a null value "
+                    "rather than being left out of the response.",
         min_items=1
     )
 
-    conflate:bool = Field(
+    conflate: bool = Field(
         True,
-        title="Whether to apply gene/protein conflation"
+        description="Whether to apply GeneProtein conflation, which merges a gene with the protein it encodes. "
+                    "The gene always comes first in the combined clique."
     )
 
     description: bool = Field(
         False,
-        title="Whether to return CURIE descriptions when possible"
+        description="Whether to return CURIE descriptions when possible. Descriptions currently come only from "
+                    "UberGraph, so most identifiers have none."
     )
 
     drug_chemical_conflate: bool = Field(
         False,
-        title="Whether to apply drug/chemical conflation"
+        description="Whether to apply DrugChemical conflation, which merges a drug with its active ingredient. "
+                    "The active ingredient comes before any formulations in the combined clique. "
+                    "Note that this defaults to false here but true on the GET method of this endpoint "
+                    "(https://github.com/NCATSTranslator/NodeNormalization/issues/398)."
     )
 
     individual_types: bool = Field(
         False,
-        title="Whether to return individual types for equivalent identifiers"
+        description="Whether to return the Biolink type of each equivalent identifier. Useful for telling apart "
+                    "the members of a conflated clique, which are otherwise returned as one flat list."
     )
 
     include_taxa: bool = Field(
         True,
-        title="Whether to return taxa for equivalent identifiers"
+        description="Whether to return the taxa associated with each equivalent identifier, as NCBITaxon CURIEs."
     )
 
     class Config:
@@ -48,6 +55,8 @@ class CurieList(BaseModel):
                 "conflate": True,
                 "description": False,
                 "drug_chemical_conflate": True,
+                "individual_types": False,
+                "include_taxa": True,
             }
         }
 
@@ -57,7 +66,7 @@ class SemanticTypesInput(BaseModel):
 
     semantic_types: List[str] = Field(
         ...,  # required field
-        title='list of semantic types',
+        description="The Biolink semantic types to report on. Pass an empty list for every semantic type.",
     )
 
     class Config:
@@ -79,6 +88,6 @@ class SetIDQuery(BaseModel):
 
     conflations: List[str] = Field(
         [],
-        description="Set of conflations to apply",
+        description="Set of conflations to apply. See /get_allowed_conflations for the valid values.",
         example=["GeneProtein", "DrugChemical"],
     )

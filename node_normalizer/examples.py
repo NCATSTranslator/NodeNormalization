@@ -138,3 +138,34 @@ EXAMPLE_QUERY_DRUG_TREATS_ESSENTIAL_HYPERTENSION = {
         ],
     }
 }
+
+
+# An example response from /get_normalized_nodes, used to document the endpoint. Shows a CURIE that
+# normalizes (MESH:D014867 -> CHEBI:15377) and one that does not (RUBBISH:1234 -> null).
+EXAMPLE_NORMALIZED_NODES = {
+    "MESH:D014867": {
+        "id": {
+            "identifier": "CHEBI:15377",
+            "label": "Water",
+        },
+        "equivalent_identifiers": [
+            {"identifier": "CHEBI:15377", "label": "water", "type": "biolink:SmallMolecule"},
+            {"identifier": "UNII:059QF0KO0R", "label": "WATER", "type": "biolink:SmallMolecule"},
+            {"identifier": "PUBCHEM.COMPOUND:962", "label": "Water", "type": "biolink:SmallMolecule"},
+            {"identifier": "MESH:D014867", "label": "Water", "type": "biolink:SmallMolecule"},
+        ],
+        "type": [
+            "biolink:SmallMolecule",
+            "biolink:MolecularEntity",
+            "biolink:ChemicalEntity",
+            "biolink:PhysicalEssence",
+            "biolink:ChemicalOrDrugOrTreatment",
+            "biolink:ChemicalEntityOrGeneOrGeneProduct",
+            "biolink:ChemicalEntityOrProteinOrPolypeptide",
+            "biolink:NamedThing",
+            "biolink:PhysicalEssenceOrOccurrent",
+        ],
+        "information_content": 47.7,
+    },
+    "RUBBISH:1234": None,
+}

@@ -10,8 +10,7 @@ NodeNorm is really two programs that share some code:
 
 - **The frontend** — a FastAPI service (`node_normalizer/server.py`) that answers
   normalization queries by reading the backend Redis databases. This is what runs
-  in production, both at `/` and behind a TRAPI version like `/1.5/`. See
-  [Frontend](#frontend) below.
+  in production, at `/`. See [Frontend](#frontend) below.
 - **The loader** — a batch program (`node_normalizer/loader/`, invoked via the
   root `load.py`) that reads Babel compendium/conflation files and populates those
   Redis databases. See [Loader.md](Loader.md).
@@ -53,9 +52,13 @@ test gotchas and the requests/docker/testcontainers landmine, see
 
 ## Frontend
 
-The FastAPI app in `node_normalizer/server.py` serves the normalization API both
-at `/` and behind a TRAPI version like `/1.5/` (`GET/POST /get_normalized_nodes`,
-`/query`, `/get_setid`, `/get_semantic_types`, `/get_curie_prefixes`, `/status`).
+The FastAPI app in `node_normalizer/server.py` serves the normalization API at `/`
+(`GET/POST /get_normalized_nodes`, `/query`, `/get_setid`, `/get_semantic_types`,
+`/get_curie_prefixes`, `/status`). Deployments have historically also been reachable
+behind a TRAPI version prefix like `/1.5/`; those paths are deprecated and will be
+removed. The only place a version prefix should still appear is the `servers` block
+of the OpenAPI schema, where it is set from `SERVER_ROOT`/`TRAPI_VERSION`
+(`node_normalizer/apidocs.py`) — also temporary.
 It reads the backend
 Redis databases via the async `RedisConnection` in `node_normalizer/redis_adapter.py`
 and never touches the loader. Core logic lives in `node_normalizer/normalizer.py`;

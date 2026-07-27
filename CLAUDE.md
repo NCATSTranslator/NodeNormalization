@@ -71,7 +71,7 @@ Babel Compendia Files → loader.py → Redis (7 DBs) → FastAPI (server.py) �
 
 ### Key Modules
 
-- **`node_normalizer/server.py`** — FastAPI app with all REST endpoints. Uses lifespan events for Redis connection setup/teardown. Root path is `/1.3`.
+- **`node_normalizer/server.py`** — FastAPI app with all REST endpoints. Uses lifespan events for Redis connection setup/teardown. Root path is `/`.
 - **`node_normalizer/normalizer.py`** — Core logic: `get_normalized_nodes()`, `normalize_message()` (for TRAPI), and equivalent CURIE discovery. Traverses Biolink Model ancestors for semantic type expansion.
 - **`node_normalizer/loader/`** — the data loader: synchronous module-level functions (`load_all`, `load_compendium`, `load_conflation`, `merge_semantic_meta_data`) that read flat compendia files and populate Redis. Validates input against `resources/valid_data_format.json`. Batch size: 100,000. Invoked via the root `load.py`. `load_all` disables Redis periodic saves (`CONFIG SET save ""`) for the duration of the load — the backend DBs are write-once and persisted by a manual BGSAVE, so snapshotting during the load is wasted work. See `documentation/Loader.md`.
 - **`node_normalizer/config.py`** — shared repo-relative paths (`config.json`, `redis_config.yaml`, `resources/`) and `get_config()`. Used by both frontend and loader.

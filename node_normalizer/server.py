@@ -26,12 +26,13 @@ from .model import (
     ConflationList,
     SetIDResponse,
     SetIDQuery,
+    NormalizedNode,
 )
 from .normalizer import get_normalized_nodes, get_curie_prefixes, normalize_message
 from .set_id import generate_setid
 from .redis_adapter import RedisConnectionFactory
 from .util import LoggingUtil
-from .examples import EXAMPLE_QUERY_DRUG_TREATS_ESSENTIAL_HYPERTENSION
+from .examples import EXAMPLE_QUERY_DRUG_TREATS_ESSENTIAL_HYPERTENSION, EXAMPLE_NORMALIZED_NODES
 
 logger = LoggingUtil.init_logging()
 
@@ -96,7 +97,15 @@ async def shutdown_event():
 @app.get(
     "/status",
     summary="Status information on this NodeNorm instance",
-    description="Returns information about this NodeNorm instance and the databases it is connected to."
+    description="Returns information about this NodeNorm instance and the databases it is connected to, including "
+                "the version of <a href=\"https://github.com/NCATSTranslator/Babel\">Babel</a> whose output is loaded "
+                "into those databases (<code>babel_version</code>) and the Biolink Model version used to expand "
+                "semantic types (<code>biolink_model</code>). The backend databases are written once and never "
+                "updated in place, so <code>babel_version</code> identifies the data this instance will return until "
+                "an operator loads a newer build. You can read more about this endpoint in the "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#status\">"
+                "NodeNorm API documentation</a>.",
+    response_description="Information about this NodeNorm instance and the databases it is connected to.",
 )
 async def status_get() -> Dict:
     """ Return status information about this NodeNorm instance as well as its databases. """
@@ -179,8 +188,16 @@ async def status() -> Dict:
 
 @app.post(
     "/query",
-    summary="Normalizes a TRAPI response object",
-    description="Returns the response object with a merged knowledge graph and query graph bindings",
+    summary="Normalizes every identifier in a TRAPI message",
+    description="Normalizes the identifiers in the knowledge graph, query graph and results of a TRAPI message, "
+                "returning the message with a merged knowledge graph and updated bindings. Each normalized node also "
+                "gains the clique's information content as an attribute "
+                "(<code>biolink:has_numeric_value</code> / <code>information_content</code>). "
+                "<strong>Deprecated</strong>: this endpoint is no longer actively maintained and will be removed once "
+                "the Workflow Runner stops using it "
+                "(<a href=\"https://github.com/NCATSTranslator/NodeNormalization/pull/323\">PR #323</a>). New callers "
+                "should extract the CURIEs they care about and use /get_normalized_nodes instead.",
+    response_description="The submitted TRAPI message with all identifiers normalized.",
     response_model=reasoner_pydantic.Query,
     response_model_exclude_none=True,
     response_model_exclude_unset=True,
@@ -199,8 +216,15 @@ async def query(query: Annotated[reasoner_pydantic.Query, Body(openapi_examples=
 
 @app.post(
     "/asyncquery",
-    summary="Normalizes a TRAPI response object",
-    description="Returns the response object with a merged knowledge graph and query graph bindings",
+    summary="Normalizes every identifier in a TRAPI message, returning the result to a callback URL",
+    description="Identical to /query, except that it returns as soon as the work has been queued and POSTs the "
+                "normalized TRAPI message to the <code>callback</code> URL given in the request body when it is "
+                "ready (retrying a few times if the callback fails). "
+                "<strong>Deprecated</strong>: this endpoint is no longer actively maintained and will be removed once "
+                "the Workflow Runner stops using it "
+                "(<a href=\"https://github.com/NCATSTranslator/NodeNormalization/pull/323\">PR #323</a>). New callers "
+                "should extract the CURIEs they care about and use /get_normalized_nodes instead.",
+    response_description="Confirmation that the query has been queued; the normalized message is sent to the callback URL.",
     deprecated=True,
 )
 async def async_query(async_query: reasoner_pydantic.AsyncQuery):
@@ -246,8 +270,22 @@ async def async_query_task(async_query: reasoner_pydantic.AsyncQuery):
 
 @app.get(
     "/get_allowed_conflations",
-    summary="Get the available conflations",
-    description="The returned strings can be included in an option to /get_normalized_nodes",
+    summary="Return a list of named conflations.",
+    description="Returns a list of allowed conflation options. Conflation allows cliques to be combined on-the-fly "
+                "on the basis of two different criteria:"
+                "<ol>"
+                "<li><code>GeneProtein</code> conflation merges protein-coding genes with the proteins they encode. "
+                "The gene(s) always appear first in the combined clique."
+                "<li><code>DrugChemical</code> conflation merges chemicals based on their active ingredient. We "
+                "attempt to ensure that the active ingredient appears before any formulations in the combined clique."
+                "</ol>"
+                "The returned strings can be used with the <code>conflation</code> parameter of /get_setid; "
+                "/get_normalized_nodes has a separate boolean flag for each. You can read "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/Babel.md#conflation\">"
+                "more about conflation</a> or "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_allowed_conflations\">"
+                "more about this endpoint</a>.",
+    response_description="The list of conflations supported by this NodeNorm instance.",
 )
 async def get_conflations() -> ConflationList:
     """
@@ -261,10 +299,26 @@ async def get_conflations() -> ConflationList:
 @app.get(
     "/get_normalized_nodes",
     summary="Get the equivalent identifiers and semantic types for the CURIEs entered.",
-    description="Returns the equivalent identifiers and semantic types for the CURIEs entered."
-                "You can optionally <a href=\"https://github.com/NCATSTranslator/Babel/blob/master/docs/Conflation.md\">conflate identifiers</a> if needed."
+    description="Returns the equivalent identifiers and semantic types for the CURIEs entered. "
+                "A CURIE that cannot be normalized is returned as a key with a <code>null</code> value rather than "
+                "being left out of the response. "
+                "You can optionally "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/Babel.md#conflation\">"
+                "conflate identifiers</a> if needed: <code>conflate</code> merges genes with the proteins they encode "
+                "(the gene comes first), and <code>drug_chemical_conflate</code> merges drugs with their active "
+                "ingredient (the ingredient comes before any formulations). Conflated cliques are returned as a single "
+                "flat list of equivalent identifiers, so use <code>individual_types</code> if you need to tell the "
+                "members apart. "
                 "You can read more about this endpoint in the "
-                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/API.md#get_normalized_nodes\">NodeNorm API documentation</a>.",
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_normalized_nodes\">NodeNorm API documentation</a>, "
+                "and about where the identifiers, labels and information content values come from in "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/Babel.md\">"
+                "Where NodeNorm's data comes from</a>.",
+    responses={200: {
+        "model": Dict[str, Optional[NormalizedNode]],
+        "description": "A mapping from each CURIE queried to its normalized clique, or to null if it could not be normalized.",
+        "content": {"application/json": {"example": EXAMPLE_NORMALIZED_NODES}},
+    }},
 )
 async def get_normalized_node_handler(
     curie: List[str] = fastapi.Query(
@@ -299,8 +353,21 @@ async def get_normalized_node_handler(
 
 @app.post(
     "/get_normalized_nodes",
-    summary="Get the equivalent identifiers and semantic types for the curie(s) entered.",
-    description="Returns the equivalent identifiers and semantic types for the curie(s). Use the `conflate` flag to choose whether to apply conflation.",
+    summary="Get the equivalent identifiers and semantic types for the CURIEs entered.",
+    description="Returns the equivalent identifiers and semantic types for the CURIEs entered. Identical to the GET "
+                "method of this endpoint, but takes a <code>curies</code> list in a JSON body instead of repeated "
+                "<code>curie</code> query parameters. "
+                "<strong>Note that <code>drug_chemical_conflate</code> currently defaults to <code>false</code> here "
+                "but <code>true</code> on the GET method</strong> "
+                "(<a href=\"https://github.com/NCATSTranslator/NodeNormalization/issues/398\">#398</a>); set it "
+                "explicitly if you care which conflations are applied. "
+                "You can read more about this endpoint in the "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_normalized_nodes\">NodeNorm API documentation</a>.",
+    responses={200: {
+        "model": Dict[str, Optional[NormalizedNode]],
+        "description": "A mapping from each CURIE queried to its normalized clique, or to null if it could not be normalized.",
+        "content": {"application/json": {"example": EXAMPLE_NORMALIZED_NODES}},
+    }},
 )
 async def get_normalized_node_handler_post(curies: CurieList):
     """
@@ -322,7 +389,18 @@ async def get_normalized_node_handler_post(curies: CurieList):
 @app.get(
     "/get_setid",
     response_model=SetIDResponse,
-    summary="Normalize and deduplicate a set of identifiers and return a single hash that represents this set."
+    summary="Normalize and deduplicate a set of identifiers and return a single hash that represents this set.",
+    description="Returns the set ID for a given set of CURIEs. CURIEs that can be normalized are normalized (using "
+                "the conflations provided); those that cannot are kept as-is. Duplicates are then removed, the "
+                "remaining CURIEs are sorted, and a hash is generated from them. "
+                "A set ID is an identifier that can be used to identify this set of CURIEs going forward. It is "
+                "currently impossible to recreate a set of CURIEs from a set ID, but the same set of CURIEs given to "
+                "the same version of Node Normalization will always return the same set ID. Note that a different "
+                "Babel build may normalize the same CURIEs differently and so produce a different set ID — see "
+                "<code>babel_version</code> in /status. "
+                "You can read more about this endpoint in the "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_setid\">NodeNorm API documentation</a>.",
+    response_description="The normalized CURIEs and the set ID calculated from them.",
 )
 async def get_setid(
     curie: List[str] = fastapi.Query(
@@ -343,7 +421,13 @@ async def get_setid(
 @app.post(
     "/get_setid",
     response_model=List[SetIDResponse],
-    summary="Normalize and deduplicate a set of identifiers and return a single hash that represents this set."
+    summary="Normalize and deduplicate a set of identifiers and return a single hash that represents this set.",
+    description="Identical to the GET method of this endpoint, but calculates a set ID for several sets at once. "
+                "Takes a list of sets, each with its own <code>curies</code> and optional <code>conflations</code>, "
+                "and returns a list of results in the same order. "
+                "You can read more about this endpoint in the "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_setid\">NodeNorm API documentation</a>.",
+    response_description="One result per set submitted, in the order submitted.",
 )
 async def get_setid(
     sets: List[SetIDQuery] = fastapi.Body([],
@@ -367,7 +451,12 @@ async def get_setid(
     "/get_semantic_types",
     response_model=SemanticTypes,
     summary="Return a list of BioLink semantic types for which normalization has been attempted.",
-    description="Returns a distinct set of the semantic types discovered in the compendium data.",
+    description="Returns a distinct, unordered set of the Biolink semantic types found in the "
+                "<a href=\"https://github.com/NCATSTranslator/Babel\">Babel</a> compendia loaded into this instance. "
+                "Returns 404 if no semantic types could be found, which usually means the databases have not been "
+                "loaded. You can read more about this endpoint in the "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_semantic_types\">NodeNorm API documentation</a>.",
+    response_description="The distinct Biolink semantic types present in this instance.",
 )
 async def get_semantic_types_handler() -> SemanticTypes:
     # look for all biolink semantic types
@@ -389,11 +478,20 @@ async def get_semantic_types_handler() -> SemanticTypes:
     "/get_curie_prefixes",
     response_model=Dict[str, CuriePivot],
     summary="Return the number of times each CURIE prefix appears in an equivalent identifier for a semantic type",
-    description="Returns the curies and their hit count for a semantic type(s).",
+    description="Returns the CURIE prefixes and their hit counts for one or more semantic types. Omit "
+                "<code>semantic_type</code> to get every semantic type. Counts are returned as strings. "
+                "These counts are tallied when the "
+                "<a href=\"https://github.com/NCATSTranslator/Babel\">Babel</a> compendia are loaded into this "
+                "instance and are approximate — the load aggregates them concurrently without locking "
+                "(<a href=\"https://github.com/NCATSTranslator/NodeNormalization/issues/380\">#380</a>), so prefer "
+                "Babel's own reports if you need exact figures. You can read more about this endpoint in the "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_curie_prefixes\">NodeNorm API documentation</a>.",
+    response_description="A mapping from each semantic type requested to its CURIE prefix counts.",
 )
 async def get_curie_prefixes_handler(
-    semantic_type: Optional[List[str]] = fastapi.Query([], description="e.g. biolink:ChemicalEntity, "
-                                                                       "biolink:AnatomicalEntity")
+    semantic_type: Optional[List[str]] = fastapi.Query([], description="The semantic types to report on, e.g. "
+                                                                       "biolink:ChemicalEntity, "
+                                                                       "biolink:AnatomicalEntity. Omit for all types.")
 ) -> Dict[str, CuriePivot]:
     return await get_curie_prefixes(app, semantic_type)
 
@@ -402,7 +500,10 @@ async def get_curie_prefixes_handler(
     "/get_curie_prefixes",
     response_model=Dict[str, CuriePivot],
     summary="Return the number of times each CURIE prefix appears in an equivalent identifier for a semantic type",
-    description="Returns the curies and their hit count for a semantic type(s).",
+    description="Identical to the GET method of this endpoint, but takes the list of semantic types in a JSON body. "
+                "You can read more about this endpoint in the "
+                "<a href=\"https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/API.md#get_curie_prefixes\">NodeNorm API documentation</a>.",
+    response_description="A mapping from each semantic type requested to its CURIE prefix counts.",
 )
 async def get_curie_prefixes_handler(
     semantic_types: SemanticTypesInput,

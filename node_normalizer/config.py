@@ -16,6 +16,10 @@ CONFIG_PATH = REPO_ROOT / "config.json"
 REDIS_CONFIG_PATH = REPO_ROOT / "redis_config.yaml"
 RESOURCES_DIR = Path(__file__).parent / "resources"
 
+# Agent-facing instructions for using this API, served at /llms.txt. Note that the
+# Dockerfile has to COPY ./skills for this to exist in a deployed image.
+SKILL_PATH = REPO_ROOT / "skills" / "nodenorm" / "SKILL.md"
+
 
 def get_config() -> dict:
     """Load and return the parsed config.json."""

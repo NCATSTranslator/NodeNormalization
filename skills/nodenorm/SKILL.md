@@ -55,7 +55,8 @@ Repeat `curie=` for a handful of identifiers. Response:
 - **`equivalent_identifiers`** — every identifier for this concept, in the Biolink Model's preferred
   prefix order. **This is the field that answers "connect this to another database."** Note that
   **`label` is often absent** on individual entries, so read it with `.get("label")` rather than
-  `["label"]`.
+  `["label"]`. With `individual_types=true` each entry also gains a `type`, which is a **single
+  string**, not a list like the clique-level `type`.
 - **`type`** — Biolink classes, most specific first.
 - **`information_content`** — 0.0 (broad concept) to 100.0 (very specific). Absent when unknown.
 
@@ -88,7 +89,9 @@ The response is keyed by input CURIE, with the same value shape as the GET metho
 - **Deduplicate before sending.** The response is a dictionary, so duplicates buy you nothing.
 - **Chunk at around 1000 per request.** Larger batches work but tie up a shared public service.
 - **An identifier that cannot be normalized comes back as `null`** — the key is present with a null
-  value, it is *not* omitted. Check for null values, not for missing keys.
+  value, it is *not* omitted. Check for null values, not for missing keys. This covers input that is
+  not a CURIE at all: `"not a curie"`, and even `""`, return `null` with HTTP 200 rather than an
+  error, so malformed input fails silently and will not be caught for you.
 - **Response keys echo your input exactly**, including any surrounding whitespace. Look results up
   by the exact string you sent, not a cleaned-up version.
 
@@ -102,12 +105,19 @@ both the preferred identifier and the size of `equivalent_identifiers`, sometime
 | `conflate` | A gene with the protein it encodes | the **gene** |
 | `drug_chemical_conflate` | A drug with its active ingredient | the **active ingredient** |
 
-Real numbers from the live service:
+**Only the conflation matching the concept's kind does anything; the other flag is a no-op.** You do
+not have to guess which flag to try:
 
-- `NCBIGene:1756` — 5 equivalent identifiers unconflated, **22** with `conflate=true`
-  (5 `biolink:Gene` + 17 `biolink:Protein`).
-- `MESH:D014867` (water) — 30 equivalent identifiers unconflated, **206** with
-  `drug_chemical_conflate=true`.
+| The concept is | The flag that matters | The other flag |
+|---|---|---|
+| A gene or a protein | `conflate` | does nothing |
+| A chemical or a drug | `drug_chemical_conflate` | does nothing |
+| Anything else (disease, phenotype, anatomy…) | neither — conflation has no effect | does nothing |
+
+Measured across all four flag combinations: `NCBIGene:1756` and `UniProtKB:P11532` move only with
+`conflate` (5→22 and 4→22); `CHEBI:15377`, `MESH:D014867` and `CHEBI:15365` move only with
+`drug_chemical_conflate` (30→206, 30→206, 21→436); `MONDO:0005148` and `HP:0002465` do not move at
+all. Setting both flags is therefore always safe — it just means "conflate whatever is conflatable."
 
 ### Always set both flags explicitly
 
@@ -118,10 +128,12 @@ GET  /get_normalized_nodes?curie=MESH:D014867          → 206 equivalent identi
 POST /get_normalized_nodes {"curies":["MESH:D014867"]} →  30 equivalent identifiers
 ```
 
-GET defaults both flags to true; the POST body defaults `drug_chemical_conflate` to false. This is a
-known bug ([NodeNormalization#398](https://github.com/NCATSTranslator/NodeNormalization/issues/398)).
-Until it is fixed, **set `conflate` and `drug_chemical_conflate` explicitly on every request** and
-you will not be caught by it.
+GET defaults both flags to true. The POST body also defaults `conflate` to true, but defaults
+**`drug_chemical_conflate` to false** — that one flag is the entire difference, which is why the
+example above changes for a chemical and would not change for a gene. This is a known bug
+([NodeNormalization#398](https://github.com/NCATSTranslator/NodeNormalization/issues/398)). Until it
+is fixed, **set `conflate` and `drug_chemical_conflate` explicitly on every request** and you will
+not be caught by it.
 
 ### Which setting do you want?
 
@@ -200,9 +212,18 @@ not tell you when you get them wrong.**
   Always check the `conflations` field echoed back in the response — if it is `[]` when you asked for
   a conflation, your parameter name was wrong.
 
-One request is **one set**, not a batch. To hash several sets in one call, POST a list of
-`{"curies": [...], "conflations": [...]}` objects — note that the POST body field *is* `conflations`
-(plural), differing from the GET query parameter.
+One GET request is **one set**, not a batch. To hash several sets in one call, POST a bare JSON
+array (not an object wrapping one) and get a parallel array back. Note that the POST body field
+*is* `conflations` — plural, the opposite of the GET query parameter, and the singular form is
+silently ignored here too:
+
+```json
+POST /get_setid
+[
+  {"curies": ["UniProtKB:P11532"], "conflations": ["GeneProtein"]},
+  {"curies": ["NCBIGene:1756"],    "conflations": ["GeneProtein"]}
+]
+```
 
 The response also carries `normalized_curies` (what the hash was built from — check this if a result
 surprises you), `normalized_string`, and `error`.

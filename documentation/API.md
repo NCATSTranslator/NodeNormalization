@@ -352,7 +352,7 @@ Example output:
 ## TRAPI Normalization (deprecated)
 
 These two endpoints normalize an entire TRAPI message rather than a list of CURIEs. Both are
-deprecated ([PR #323](https://github.com/TranslatorSRI/NodeNormalization/pull/323)): they are no
+deprecated ([PR #323](https://github.com/NCATSTranslator/NodeNormalization/pull/323)): they are no
 longer actively maintained, and will be removed once the Workflow Runner stops using them. New
 callers should extract the CURIEs they care about and use `/get_normalized_nodes` instead.
 

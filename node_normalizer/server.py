@@ -195,7 +195,7 @@ async def status() -> Dict:
                 "(<code>biolink:has_numeric_value</code> / <code>information_content</code>). "
                 "<strong>Deprecated</strong>: this endpoint is no longer actively maintained and will be removed once "
                 "the Workflow Runner stops using it "
-                "(<a href=\"https://github.com/TranslatorSRI/NodeNormalization/pull/323\">PR #323</a>). New callers "
+                "(<a href=\"https://github.com/NCATSTranslator/NodeNormalization/pull/323\">PR #323</a>). New callers "
                 "should extract the CURIEs they care about and use /get_normalized_nodes instead.",
     response_description="The submitted TRAPI message with all identifiers normalized.",
     response_model=reasoner_pydantic.Query,
@@ -222,7 +222,7 @@ async def query(query: Annotated[reasoner_pydantic.Query, Body(openapi_examples=
                 "ready (retrying a few times if the callback fails). "
                 "<strong>Deprecated</strong>: this endpoint is no longer actively maintained and will be removed once "
                 "the Workflow Runner stops using it "
-                "(<a href=\"https://github.com/TranslatorSRI/NodeNormalization/pull/323\">PR #323</a>). New callers "
+                "(<a href=\"https://github.com/NCATSTranslator/NodeNormalization/pull/323\">PR #323</a>). New callers "
                 "should extract the CURIEs they care about and use /get_normalized_nodes instead.",
     response_description="Confirmation that the query has been queued; the normalized message is sent to the callback URL.",
     deprecated=True,

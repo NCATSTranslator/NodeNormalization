@@ -45,7 +45,7 @@ Either way you can also just create the directory and save the file into it by h
 ```bash
 mkdir -p ~/.claude/skills/nodenorm
 curl -o ~/.claude/skills/nodenorm/SKILL.md \
-  https://raw.githubusercontent.com/NCATSTranslator/NodeNormalization/master/skills/nodenorm/SKILL.md
+  https://raw.githubusercontent.com/NCATSTranslator/NodeNormalization/main/skills/nodenorm/SKILL.md
 ```
 
 Claude Code will then offer it as `/nodenorm`, and will also load it automatically when a task

@@ -259,4 +259,4 @@ The identifiers, preferred names, types and information content all come from
 [Babel](https://github.com/NCATSTranslator/Babel), which is what decides that two identifiers are
 equivalent. If a clique looks wrong — two concepts merged, or one concept split in two — that is a
 Babel issue, not a NodeNorm one. See
-[Where NodeNorm's data comes from](https://github.com/NCATSTranslator/NodeNormalization/blob/master/documentation/Babel.md).
+[Where NodeNorm's data comes from](https://github.com/NCATSTranslator/NodeNormalization/blob/main/documentation/Babel.md).
